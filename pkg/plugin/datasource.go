@@ -10,7 +10,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	"os"
-	"reflect"
+	"strings"
 	"time"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
@@ -124,20 +124,19 @@ func (d *Datasource) query(_ context.Context, pCtx backend.PluginContext, query 
 	if qm.RequestTimeout == 0 {
 		qm.RequestTimeout = 5 * time.Second
 	}
-	// TODO: test.simpleJsonObj
 	if qm.QueryType == QueryTypeRequestReply {
 		resp, err := natsConn.Request(qm.NatsSubject, []byte(qm.RequestData), qm.RequestTimeout)
 		if err != nil {
 			return backend.ErrDataResponse(backend.StatusBadRequest, "NATS request error: "+err.Error())
 		}
 
-		return convertJsonBytesToResponse(resp.Data)
+		return convertJsonBytesToResponse(resp.Data, qm.JqExpression)
 	} else {
 		return backend.ErrDataResponse(backend.StatusBadRequest, "Invalid Query Type: "+qm.QueryType)
 	}
 }
 
-func convertJsonBytesToResponse(respData []byte) backend.DataResponse {
+func convertJsonBytesToResponse(respData []byte, jqExpression string) backend.DataResponse {
 	var response backend.DataResponse
 
 	// Get slice of data with optional leading whitespace removed.
@@ -149,22 +148,46 @@ func convertJsonBytesToResponse(respData []byte) backend.DataResponse {
 	var err error
 
 	if isArray {
-		var v []map[string]interface{}
-		if err := json.Unmarshal(respData, &v); err != nil {
-			return backend.ErrDataResponse(backend.StatusBadRequest, "JSON could not be parsed: "+err.Error())
+		if strings.TrimSpace(jqExpression) != "" {
+			var v []interface{}
+			if err := json.Unmarshal(respData, &v); err != nil {
+				return backend.ErrDataResponse(backend.StatusBadRequest, "JSON could not be parsed: "+err.Error())
+			}
+			v, err := processViaGojq(v, jqExpression)
+			if err != nil {
+				return backend.ErrDataResponse(backend.StatusBadRequest, fmt.Sprintf("JQ transfer did not work: %s", err.Error()))
+			}
+			frame, err = framestruct.ToDataFrame("response", v)
+		} else {
+			var v []map[string]interface{}
+			if err := json.Unmarshal(respData, &v); err != nil {
+				return backend.ErrDataResponse(backend.StatusBadRequest, "JSON could not be parsed: "+err.Error())
+			}
+			frame, err = framestruct.ToDataFrame("response", v)
 		}
-		frame, err = framestruct.ToDataFrame("response", v)
 		if err != nil {
-			return backend.ErrDataResponse(backend.StatusBadRequest, fmt.Sprintf("JSON could not be converted to DataFrame: %s. Reflected type: %s", err.Error(), reflect.ValueOf(v).Kind()))
+			return backend.ErrDataResponse(backend.StatusBadRequest, fmt.Sprintf("JSON could not be converted to DataFrame: %s", err.Error()))
 		}
 	} else if isObject {
-		var v map[string]interface{}
-		if err := json.Unmarshal(respData, &v); err != nil {
-			return backend.ErrDataResponse(backend.StatusBadRequest, "JSON could not be parsed: "+err.Error())
+		if strings.TrimSpace(jqExpression) != "" {
+			var v interface{}
+			if err := json.Unmarshal(respData, &v); err != nil {
+				return backend.ErrDataResponse(backend.StatusBadRequest, "JSON could not be parsed: "+err.Error())
+			}
+			v, err := processViaGojq(v, jqExpression)
+			if err != nil {
+				return backend.ErrDataResponse(backend.StatusBadRequest, fmt.Sprintf("JQ transfer did not work: %s", err.Error()))
+			}
+			frame, err = framestruct.ToDataFrame("response", v)
+		} else {
+			var v map[string]interface{}
+			if err := json.Unmarshal(respData, &v); err != nil {
+				return backend.ErrDataResponse(backend.StatusBadRequest, "JSON could not be parsed: "+err.Error())
+			}
+			frame, err = framestruct.ToDataFrame("response", v)
 		}
-		frame, err = framestruct.ToDataFrame("response", v)
 		if err != nil {
-			return backend.ErrDataResponse(backend.StatusBadRequest, fmt.Sprintf("JSON could not be converted to DataFrame: %s. Reflected type: %s", err.Error(), reflect.ValueOf(v).Kind()))
+			return backend.ErrDataResponse(backend.StatusBadRequest, fmt.Sprintf("JSON could not be converted to DataFrame: %s", err.Error()))
 		}
 	} else {
 		// not an array nor an object. Respond with a single-column "result" string dataframe.

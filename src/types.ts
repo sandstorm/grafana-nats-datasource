@@ -6,6 +6,7 @@ export interface MyQuery extends DataQuery {
     natsSubject: string;
     requestTimeout: string;
     requestData: string;
+    jqExpression: string;
 }
 
 export const QueryTypeOptions = [

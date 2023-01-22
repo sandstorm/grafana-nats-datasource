@@ -1,5 +1,5 @@
 import React, {PureComponent} from 'react';
-import {InlineField, Input, Select} from '@grafana/ui';
+import {InlineField, Input, Select, TextArea} from '@grafana/ui';
 import {
     QueryEditorProps, SelectableValue
 } from '@grafana/data';
@@ -52,6 +52,15 @@ export class QueryEditor extends PureComponent<Props> {
                             className="width-2"
                             value={query.requestTimeout}
                             onChange={onChange(this.props, 'requestTimeout')}
+                        />
+                    </InlineField>
+                </div>
+                <div className="gf-form">
+                    <InlineField label="Optional JQ Processing Expression">
+                        <TextArea
+                            className="width-27"
+                            value={query.jqExpression}
+                            onChange={onChange(this.props, 'jqExpression')}
                         />
                     </InlineField>
                 </div>

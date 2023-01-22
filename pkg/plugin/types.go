@@ -27,4 +27,5 @@ type queryModel struct {
 	NatsSubject    string        `json:"natsSubject"`
 	RequestTimeout time.Duration `json:"requestTimeout"`
 	RequestData    string        `json:"requestData"`
+	JqExpression   string        `json:"jqExpression"`
 }
