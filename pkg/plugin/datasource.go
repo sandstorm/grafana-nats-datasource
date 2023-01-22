@@ -72,12 +72,6 @@ func (d *Datasource) QueryData(ctx context.Context, req *backend.QueryDataReques
 	return response, nil
 }
 
-type queryModel struct {
-	Subject string
-	Data    []byte
-	Timeout time.Duration
-}
-
 func (d *Datasource) loadDataSourceOptions(pCtx backend.PluginContext) (*MyDataSourceOptions, *MySecureJsonData, error) {
 	var dataSourceOptions *MyDataSourceOptions
 	err := json.Unmarshal(pCtx.DataSourceInstanceSettings.JSONData, &dataSourceOptions)
@@ -119,8 +113,6 @@ func (d *Datasource) query(_ context.Context, pCtx backend.PluginContext, query 
 	//////////////
 	// 3) do request
 	//////////////
-	var response backend.DataResponse
-
 	// Unmarshal the JSON into our queryModel.
 	var qm queryModel
 
@@ -129,25 +121,36 @@ func (d *Datasource) query(_ context.Context, pCtx backend.PluginContext, query 
 		return backend.ErrDataResponse(backend.StatusBadRequest, "json unmarshal: "+err.Error())
 	}
 
-	if qm.Timeout == 0 {
-		qm.Timeout = 5 * time.Second
+	if qm.RequestTimeout == 0 {
+		qm.RequestTimeout = 5 * time.Second
 	}
 	// TODO: test.simpleJsonObj
-	resp, err := natsConn.Request("test.simpleJsonObjArr", qm.Data, qm.Timeout)
-	if err != nil {
-		return backend.ErrDataResponse(backend.StatusBadRequest, "NATS request error: "+err.Error())
+	if qm.QueryType == QueryTypeRequestReply {
+		resp, err := natsConn.Request(qm.NatsSubject, []byte(qm.RequestData), qm.RequestTimeout)
+		if err != nil {
+			return backend.ErrDataResponse(backend.StatusBadRequest, "NATS request error: "+err.Error())
+		}
+
+		return convertJsonBytesToResponse(resp.Data)
+	} else {
+		return backend.ErrDataResponse(backend.StatusBadRequest, "Invalid Query Type: "+qm.QueryType)
 	}
+}
+
+func convertJsonBytesToResponse(respData []byte) backend.DataResponse {
+	var response backend.DataResponse
 
 	// Get slice of data with optional leading whitespace removed.
 	// See RFC 7159, Section 2 for the definition of JSON whitespace.
-	x := bytes.TrimLeft(resp.Data, " \t\r\n")
+	x := bytes.TrimLeft(respData, " \t\r\n")
 	isArray := len(x) > 0 && x[0] == '['
 	isObject := len(x) > 0 && x[0] == '{'
 	var frame *data.Frame
+	var err error
 
 	if isArray {
 		var v []map[string]interface{}
-		if err := json.Unmarshal(resp.Data, &v); err != nil {
+		if err := json.Unmarshal(respData, &v); err != nil {
 			return backend.ErrDataResponse(backend.StatusBadRequest, "JSON could not be parsed: "+err.Error())
 		}
 		frame, err = framestruct.ToDataFrame("response", v)
@@ -156,7 +159,7 @@ func (d *Datasource) query(_ context.Context, pCtx backend.PluginContext, query 
 		}
 	} else if isObject {
 		var v map[string]interface{}
-		if err := json.Unmarshal(resp.Data, &v); err != nil {
+		if err := json.Unmarshal(respData, &v); err != nil {
 			return backend.ErrDataResponse(backend.StatusBadRequest, "JSON could not be parsed: "+err.Error())
 		}
 		frame, err = framestruct.ToDataFrame("response", v)
@@ -166,13 +169,11 @@ func (d *Datasource) query(_ context.Context, pCtx backend.PluginContext, query 
 	} else {
 		// not an array nor an object. Respond with a single-column "result" string dataframe.
 		frame = data.NewFrame("response")
-		frame.Fields = append(frame.Fields, data.NewField("response", nil, []json.RawMessage{resp.Data}))
+		frame.Fields = append(frame.Fields, data.NewField("response", nil, []json.RawMessage{respData}))
 	}
 
 	// add the frames to the response.
 	response.Frames = append(response.Frames, frame)
-
-	//return backend.ErrDataResponse(backend.StatusBadRequest, "resp received"+fmt.Sprintf("%+v", frame.Fields))
 
 	return response
 }

@@ -1,12 +1,23 @@
 import {DataQuery, DataSourceJsonData} from '@grafana/data';
+// These need to be synced with types.go
 
 export interface MyQuery extends DataQuery {
+    queryType: "REQUEST_REPLY";
     natsSubject: string;
-    constant: number;
+    requestTimeout: string;
+    requestData: string;
 }
 
+export const QueryTypeOptions = [
+    {
+        label: "Request/Reply",
+        value: "REQUEST_REPLY"
+    }
+];
+
 export const DEFAULT_QUERY: Partial<MyQuery> = {
-    constant: 6.5,
+    queryType: "REQUEST_REPLY",
+    requestTimeout: "5s"
 };
 
 
@@ -27,9 +38,6 @@ export const AuthenticationOptions = [
         value: "JWT"
     }
 ];
-
-
-// These need to be synced with types.go
 
 /**
  * These are options configured for each DataSource instance

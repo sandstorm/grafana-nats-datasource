@@ -1,5 +1,7 @@
 package plugin
 
+import "time"
+
 const AuthenticationNone = "NONE"
 const AuthenticationNkey = "NKEY"
 const AuthenticationUserPass = "USERPASS"
@@ -16,4 +18,13 @@ type MySecureJsonData struct {
 	NkeySeed string `json:"nkeySeed"`
 	Password string `json:"password"`
 	Jwt      string `json:"jwt"`
+}
+
+const QueryTypeRequestReply = "REQUEST_REPLY"
+
+type queryModel struct {
+	QueryType      string        `json:"queryType"`
+	NatsSubject    string        `json:"natsSubject"`
+	RequestTimeout time.Duration `json:"requestTimeout"`
+	RequestData    string        `json:"requestData"`
 }

@@ -1,42 +1,61 @@
-import React, { ChangeEvent, PureComponent } from 'react';
-import { LegacyForms } from '@grafana/ui';
-import { QueryEditorProps } from '@grafana/data';
-import { DataSource } from '../datasource';
-import { MyDataSourceOptions, MyQuery } from '../types';
-
-const { FormField } = LegacyForms;
+import React, {PureComponent} from 'react';
+import {InlineField, Input, Select} from '@grafana/ui';
+import {
+    QueryEditorProps, SelectableValue
+} from '@grafana/data';
+import {DataSource} from '../datasource';
+import {MyDataSourceOptions, MyQuery, QueryTypeOptions} from '../types';
 
 type Props = QueryEditorProps<DataSource, MyQuery, MyDataSourceOptions>;
 
 function onChange(props: Props, fieldName: string) {
     return (event: React.SyntheticEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-        props.onChange({... props.query, [fieldName]: event.currentTarget.value});
+        props.onChange({...props.query, [fieldName]: event.currentTarget.value});
+        props.onRunQuery();
+    }
+}
+
+function onSelectChange(props: Props, fieldName: string) {
+    return (selected: SelectableValue) => {
+        props.onChange({...props.query, [fieldName]: selected.value});
         props.onRunQuery();
     }
 }
 
 export class QueryEditor extends PureComponent<Props> {
-  render() {
-    const { queryText, constant } = this.props.query;
+    render() {
+        const query = this.props.query;
 
-    return (
-      <div className="gf-form">
-        <FormField
-          width={4}
-          value={constant}
-          onChange={this.onConstantChange}
-          label="Constant"
-          type="number"
-          step="0.1"
-        />
-        <FormField
-          labelWidth={8}
-          value={queryText || ''}
-          onChange={this.onQueryTextChange}
-          label="Query Text"
-          tooltip="Not used yet"
-        />
-      </div>
-    );
-  }
+        return (
+            <div className="gf-form-group">
+                <div className="gf-form">
+                    <InlineField label="Query Type" tooltip="In which way do we interact with NATS">
+                        <Select
+                            options={QueryTypeOptions}
+                            value={query.queryType}
+                            onChange={onSelectChange(this.props, 'queryType')}
+                        />
+                    </InlineField>
+                </div>
+                <div className="gf-form">
+                    <InlineField label="NATS Subject" tooltip="the subject to request - f.e. foo.bar.baz">
+                        <Input
+                            className="width-27"
+                            value={query.natsSubject}
+                            onChange={onChange(this.props, 'natsSubject')}
+                        />
+                    </InlineField>
+                </div>
+                <div className="gf-form">
+                    <InlineField label="Request Timeout">
+                        <Input
+                            className="width-2"
+                            value={query.requestTimeout}
+                            onChange={onChange(this.props, 'requestTimeout')}
+                        />
+                    </InlineField>
+                </div>
+            </div>
+        );
+    }
 }
