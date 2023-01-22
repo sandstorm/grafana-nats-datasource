@@ -1,18 +1,21 @@
 package plugin
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/grafana/grafana-plugin-sdk-go/data"
+	"github.com/grafana/grafana-plugin-sdk-go/data/framestruct"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	"os"
+	"reflect"
 	"time"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
-	"github.com/grafana/grafana-plugin-sdk-go/data"
 )
 
 // Make sure Datasource implements required interfaces. This is important to do
@@ -75,23 +78,32 @@ type queryModel struct {
 	Timeout time.Duration
 }
 
-func (d *Datasource) query(_ context.Context, pCtx backend.PluginContext, query backend.DataQuery) backend.DataResponse {
-	//////////////
-	// 1) Data Source option loading
-	//////////////
+func (d *Datasource) loadDataSourceOptions(pCtx backend.PluginContext) (*MyDataSourceOptions, *MySecureJsonData, error) {
 	var dataSourceOptions *MyDataSourceOptions
 	err := json.Unmarshal(pCtx.DataSourceInstanceSettings.JSONData, &dataSourceOptions)
 	if err != nil {
-		return backend.ErrDataResponse(backend.StatusBadRequest, "data source options json unmarshal: "+err.Error())
+		return nil, nil, fmt.Errorf("data source options json unmarshal: %w", err)
 	}
 	var dataSourceSecureOptions *MySecureJsonData
 	secureBytes, err := json.Marshal(pCtx.DataSourceInstanceSettings.DecryptedSecureJSONData)
 	if err != nil {
-		return backend.ErrDataResponse(backend.StatusBadRequest, "decrypted secureJson could not be converted to JSON: "+err.Error())
+		return nil, nil, fmt.Errorf("decrypted secureJson could not be converted to JSON: %w", err)
 	}
+
 	err = json.Unmarshal(secureBytes, &dataSourceSecureOptions)
 	if err != nil {
-		return backend.ErrDataResponse(backend.StatusBadRequest, "decrypted secureJson could not be parsed: "+err.Error())
+		return nil, nil, fmt.Errorf("decrypted secureJson could not be parsed: %w", err)
+	}
+	return dataSourceOptions, dataSourceSecureOptions, nil
+}
+
+func (d *Datasource) query(_ context.Context, pCtx backend.PluginContext, query backend.DataQuery) backend.DataResponse {
+	//////////////
+	// 1) Data Source option loading
+	//////////////
+	dataSourceOptions, dataSourceSecureOptions, err := d.loadDataSourceOptions(pCtx)
+	if err != nil {
+		return backend.ErrDataResponse(backend.StatusBadRequest, "data source could not be loaded: "+err.Error())
 	}
 
 	//////////////
@@ -120,23 +132,47 @@ func (d *Datasource) query(_ context.Context, pCtx backend.PluginContext, query 
 	if qm.Timeout == 0 {
 		qm.Timeout = 5 * time.Second
 	}
-	_, err = natsConn.Request(qm.Subject, qm.Data, qm.Timeout)
+	// TODO: test.simpleJsonObj
+	resp, err := natsConn.Request("test.simpleJsonObjArr", qm.Data, qm.Timeout)
 	if err != nil {
 		return backend.ErrDataResponse(backend.StatusBadRequest, "NATS request error: "+err.Error())
 	}
-	// resp.Data
 
-	// create data frame response.
-	frame := data.NewFrame("response")
+	// Get slice of data with optional leading whitespace removed.
+	// See RFC 7159, Section 2 for the definition of JSON whitespace.
+	x := bytes.TrimLeft(resp.Data, " \t\r\n")
+	isArray := len(x) > 0 && x[0] == '['
+	isObject := len(x) > 0 && x[0] == '{'
+	var frame *data.Frame
 
-	// add fields.
-	frame.Fields = append(frame.Fields,
-		data.NewField("time", nil, []time.Time{query.TimeRange.From, query.TimeRange.To}),
-		data.NewField("values", nil, []int64{10, 20}),
-	)
+	if isArray {
+		var v []map[string]interface{}
+		if err := json.Unmarshal(resp.Data, &v); err != nil {
+			return backend.ErrDataResponse(backend.StatusBadRequest, "JSON could not be parsed: "+err.Error())
+		}
+		frame, err = framestruct.ToDataFrame("response", v)
+		if err != nil {
+			return backend.ErrDataResponse(backend.StatusBadRequest, fmt.Sprintf("JSON could not be converted to DataFrame: %s. Reflected type: %s", err.Error(), reflect.ValueOf(v).Kind()))
+		}
+	} else if isObject {
+		var v map[string]interface{}
+		if err := json.Unmarshal(resp.Data, &v); err != nil {
+			return backend.ErrDataResponse(backend.StatusBadRequest, "JSON could not be parsed: "+err.Error())
+		}
+		frame, err = framestruct.ToDataFrame("response", v)
+		if err != nil {
+			return backend.ErrDataResponse(backend.StatusBadRequest, fmt.Sprintf("JSON could not be converted to DataFrame: %s. Reflected type: %s", err.Error(), reflect.ValueOf(v).Kind()))
+		}
+	} else {
+		// not an array nor an object. Respond with a single-column "result" string dataframe.
+		frame = data.NewFrame("response")
+		frame.Fields = append(frame.Fields, data.NewField("response", nil, []json.RawMessage{resp.Data}))
+	}
 
 	// add the frames to the response.
 	response.Frames = append(response.Frames, frame)
+
+	//return backend.ErrDataResponse(backend.StatusBadRequest, "resp received"+fmt.Sprintf("%+v", frame.Fields))
 
 	return response
 }
@@ -150,17 +186,32 @@ func (d *Datasource) CheckHealth(_ context.Context, req *backend.CheckHealthRequ
 	// (like the *backend.QueryDataRequest)
 	log.DefaultLogger.Debug("CheckHealth called")
 
-	var status = backend.HealthStatusOk
-	var message = "Data source is working"
+	//////////////
+	// 1) Data Source option loading
+	//////////////
+	dataSourceOptions, dataSourceSecureOptions, err := d.loadDataSourceOptions(req.PluginContext)
+	if err != nil {
+		return &backend.CheckHealthResult{
+			Status:  backend.HealthStatusError,
+			Message: "Data source options could not be loaded (should never happen)" + err.Error(),
+		}, nil
+	}
 
-	/*if rand.Int()%2 == 0 {
-		status = backend.HealthStatusError
-		message = "randomized error"
-	}*/
+	//////////////
+	// 2) Connect
+	//////////////
+	natsConn, err := d.connectNats(dataSourceOptions, dataSourceSecureOptions)
+	if err != nil {
+		return &backend.CheckHealthResult{
+			Status:  backend.HealthStatusError,
+			Message: "NATS could not be connected to: " + err.Error(),
+		}, nil
+	}
+	natsConn.Close()
 
 	return &backend.CheckHealthResult{
-		Status:  status,
-		Message: message,
+		Status:  backend.HealthStatusOk,
+		Message: "Data source is working",
 	}, nil
 }
 
@@ -173,7 +224,7 @@ func (d *Datasource) connectNats(options *MyDataSourceOptions, secureOptions *My
 		natsConn, err = nats.Connect(options.NatsUrl, nats.Nkey(
 			options.Nkey,
 			func(nonce []byte) ([]byte, error) {
-				kp, err := nkeys.FromSeed(secureOptions.NkeySeed)
+				kp, err := nkeys.FromSeed([]byte(secureOptions.NkeySeed))
 				if err != nil {
 					return nil, fmt.Errorf("unable to load key pair from NkeySeed: %w", err)
 				}
@@ -193,7 +244,7 @@ func (d *Datasource) connectNats(options *MyDataSourceOptions, secureOptions *My
 			return nil, fmt.Errorf("TODO: %w", err)
 		}
 		defer os.Remove(file.Name())
-		_, err = file.Write(secureOptions.Jwt)
+		_, err = file.Write([]byte(secureOptions.Jwt))
 		if err != nil {
 			return nil, fmt.Errorf("TODO: %w", err)
 		}

@@ -8,19 +8,14 @@ const { FormField } = LegacyForms;
 
 type Props = QueryEditorProps<DataSource, MyQuery, MyDataSourceOptions>;
 
+function onChange(props: Props, fieldName: string) {
+    return (event: React.SyntheticEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+        props.onChange({... props.query, [fieldName]: event.currentTarget.value});
+        props.onRunQuery();
+    }
+}
+
 export class QueryEditor extends PureComponent<Props> {
-  onQueryTextChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const { onChange, query } = this.props;
-    onChange({ ...query, queryText: event.target.value });
-  };
-
-  onConstantChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const { onChange, query, onRunQuery } = this.props;
-    onChange({ ...query, constant: parseFloat(event.target.value) });
-    // executes the query
-    onRunQuery();
-  };
-
   render() {
     const { queryText, constant } = this.props.query;
 

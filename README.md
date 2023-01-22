@@ -12,7 +12,9 @@ dev grafana-up
 # http://127.0.0.1:3000/plugins?filterBy=all&q=nats
 
 # to hot-reload the plugin:
-dev grafana-reload-plugin 
+dev grafana-reload-plugin
+
+dev test-nats-server 
 ```
 
 

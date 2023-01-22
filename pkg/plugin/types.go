@@ -13,7 +13,7 @@ type MyDataSourceOptions struct {
 }
 
 type MySecureJsonData struct {
-	NkeySeed []byte `json:"nkeySeed"`
+	NkeySeed string `json:"nkeySeed"`
 	Password string `json:"password"`
-	Jwt      []byte `json:"jwt"`
+	Jwt      string `json:"jwt"`
 }

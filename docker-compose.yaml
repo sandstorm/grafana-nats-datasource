@@ -3,6 +3,10 @@ version: '3.0'
 services:
   grafana:
     container_name: 'sandstormmedia-nats-datasource'
+    depends_on:
+      - nats
+    environment:
+      GF_LOG_LEVEL: 'debug'
     build:
       context: ./.config
       args:
@@ -12,3 +16,8 @@ services:
     volumes:
       - ./dist:/var/lib/grafana/plugins/sandstormmedia-nats-datasource
       - ./provisioning:/etc/grafana/provisioning
+  nats:
+    container_name: nats
+    ports:
+      - '4222:4222'
+    image: nats
