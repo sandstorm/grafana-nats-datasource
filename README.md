@@ -9,7 +9,10 @@ dev setup
 dev grafana-build-backend
 dev grafana-watch-frontend
 dev grafana-up
-# http://127.0.0.1:3000/plugins?filterBy=all&q=nats 
+# http://127.0.0.1:3000/plugins?filterBy=all&q=nats
+
+# to hot-reload the plugin:
+dev grafana-reload-plugin 
 ```
 
 
@@ -28,6 +31,15 @@ npx @grafana/create-plugin
 ? Do you want to add Github CI and Release workflows? Yes
 ? Do you want to add a Github workflow for automatically checking "Grafana API compatibility" on PRs? Yes
 ```
+
+
+## Helpful links
+
+https://grafana.com/docs/grafana/latest/developers/
+https://grafana.com/docs/grafana/latest/developers/plugins/data-frames/
+https://grafana.com/docs/grafana/latest/developers/plugins/development-with-local-grafana/
+https://grafana.com/tutorials/build-a-data-source-plugin/
+https://grafana.com/tutorials/build-a-streaming-data-source-plugin/
 
 
 

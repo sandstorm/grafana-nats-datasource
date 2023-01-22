@@ -3,7 +3,10 @@ package plugin
 import (
 	"context"
 	"encoding/json"
-	"math/rand"
+	"fmt"
+	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nkeys"
+	"os"
 	"time"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
@@ -18,8 +21,11 @@ import (
 // backend.CheckHealthHandler interfaces. Plugin should not implement all these
 // interfaces- only those which are required for a particular task.
 var (
-	_ backend.QueryDataHandler      = (*Datasource)(nil)
-	_ backend.CheckHealthHandler    = (*Datasource)(nil)
+	_ backend.QueryDataHandler   = (*Datasource)(nil)
+	_ backend.CheckHealthHandler = (*Datasource)(nil)
+
+	// TODO: https://grafana.com/tutorials/build-a-streaming-data-source-plugin/
+	// _ backend.StreamHandler         = (*Datasource)(nil)
 	_ instancemgmt.InstanceDisposer = (*Datasource)(nil)
 )
 
@@ -63,18 +69,62 @@ func (d *Datasource) QueryData(ctx context.Context, req *backend.QueryDataReques
 	return response, nil
 }
 
-type queryModel struct{}
+type queryModel struct {
+	Subject string
+	Data    []byte
+	Timeout time.Duration
+}
 
 func (d *Datasource) query(_ context.Context, pCtx backend.PluginContext, query backend.DataQuery) backend.DataResponse {
+	//////////////
+	// 1) Data Source option loading
+	//////////////
+	var dataSourceOptions *MyDataSourceOptions
+	err := json.Unmarshal(pCtx.DataSourceInstanceSettings.JSONData, &dataSourceOptions)
+	if err != nil {
+		return backend.ErrDataResponse(backend.StatusBadRequest, "data source options json unmarshal: "+err.Error())
+	}
+	var dataSourceSecureOptions *MySecureJsonData
+	secureBytes, err := json.Marshal(pCtx.DataSourceInstanceSettings.DecryptedSecureJSONData)
+	if err != nil {
+		return backend.ErrDataResponse(backend.StatusBadRequest, "decrypted secureJson could not be converted to JSON: "+err.Error())
+	}
+	err = json.Unmarshal(secureBytes, &dataSourceSecureOptions)
+	if err != nil {
+		return backend.ErrDataResponse(backend.StatusBadRequest, "decrypted secureJson could not be parsed: "+err.Error())
+	}
+
+	//////////////
+	// 2) Connect
+	//////////////
+	natsConn, err := d.connectNats(dataSourceOptions, dataSourceSecureOptions)
+	if err != nil {
+		return backend.ErrDataResponse(backend.StatusBadRequest, "NATS connection error:  "+err.Error())
+	}
+	// TODO: lateron, keep the nats connection open for some minutes instead of tearing it down for every req.
+	defer natsConn.Close()
+
+	//////////////
+	// 3) do request
+	//////////////
 	var response backend.DataResponse
 
 	// Unmarshal the JSON into our queryModel.
 	var qm queryModel
 
-	err := json.Unmarshal(query.JSON, &qm)
+	err = json.Unmarshal(query.JSON, &qm)
 	if err != nil {
-		return backend.ErrDataResponse(backend.StatusBadRequest, "json unmarshal: " + err.Error())
+		return backend.ErrDataResponse(backend.StatusBadRequest, "json unmarshal: "+err.Error())
 	}
+
+	if qm.Timeout == 0 {
+		qm.Timeout = 5 * time.Second
+	}
+	_, err = natsConn.Request(qm.Subject, qm.Data, qm.Timeout)
+	if err != nil {
+		return backend.ErrDataResponse(backend.StatusBadRequest, "NATS request error: "+err.Error())
+	}
+	// resp.Data
 
 	// create data frame response.
 	frame := data.NewFrame("response")
@@ -103,13 +153,59 @@ func (d *Datasource) CheckHealth(_ context.Context, req *backend.CheckHealthRequ
 	var status = backend.HealthStatusOk
 	var message = "Data source is working"
 
-	if rand.Int()%2 == 0 {
+	/*if rand.Int()%2 == 0 {
 		status = backend.HealthStatusError
 		message = "randomized error"
-	}
+	}*/
 
 	return &backend.CheckHealthResult{
 		Status:  status,
 		Message: message,
 	}, nil
+}
+
+func (d *Datasource) connectNats(options *MyDataSourceOptions, secureOptions *MySecureJsonData) (*nats.Conn, error) {
+	var natsConn *nats.Conn
+	var err error
+	if options.Authentication == AuthenticationNone {
+		natsConn, err = nats.Connect(options.NatsUrl)
+	} else if options.Authentication == AuthenticationNkey {
+		natsConn, err = nats.Connect(options.NatsUrl, nats.Nkey(
+			options.Nkey,
+			func(nonce []byte) ([]byte, error) {
+				kp, err := nkeys.FromSeed(secureOptions.NkeySeed)
+				if err != nil {
+					return nil, fmt.Errorf("unable to load key pair from NkeySeed: %w", err)
+				}
+				// Wipe our key on exit.
+				defer kp.Wipe()
+
+				sig, _ := kp.Sign(nonce)
+				return sig, nil
+			},
+		))
+	} else if options.Authentication == AuthenticationUserPass {
+		natsConn, err = nats.Connect(options.NatsUrl, nats.UserInfo(options.Username, secureOptions.Password))
+	} else if options.Authentication == AuthenticationJWT {
+		// WORKAROUND: store credentials in a temp-file
+		file, err := os.CreateTemp("", "tmp-jwt")
+		if err != nil {
+			return nil, fmt.Errorf("TODO: %w", err)
+		}
+		defer os.Remove(file.Name())
+		_, err = file.Write(secureOptions.Jwt)
+		if err != nil {
+			return nil, fmt.Errorf("TODO: %w", err)
+		}
+		if err := file.Close(); err != nil {
+			return nil, fmt.Errorf("TODO: %w", err)
+		}
+
+		natsConn, err = nats.Connect(options.NatsUrl, nats.UserCredentials(file.Name()))
+	} else {
+		// TODO: TOKEN AUTH
+		return nil, fmt.Errorf("TODO")
+	}
+
+	return natsConn, err
 }

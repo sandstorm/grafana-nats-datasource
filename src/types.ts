@@ -29,6 +29,8 @@ export const AuthenticationOptions = [
 ];
 
 
+// These need to be synced with types.go
+
 /**
  * These are options configured for each DataSource instance
  */
@@ -38,6 +40,8 @@ export interface MyDataSourceOptions extends DataSourceJsonData {
     nkey?: string;
     username?: string;
 }
+
+// These need to be synced with types.go
 
 /**
  * Value that is used in the backend, but never sent over HTTP to the frontend.
