@@ -9,7 +9,7 @@ dev setup
 dev grafana-build-backend
 dev grafana-watch-frontend
 dev grafana-up
-# http://127.0.0.1:3000/plugins?filterBy=all&filterByType=app&q=nats 
+# http://127.0.0.1:3000/plugins?filterBy=all&q=nats 
 ```
 
 
