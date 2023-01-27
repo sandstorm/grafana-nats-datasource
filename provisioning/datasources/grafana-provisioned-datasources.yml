@@ -1,0 +1,17 @@
+# config file version
+apiVersion: 1
+
+datasources:
+  - name: NATS-System
+    type: sandstormmedia-nats-datasource
+    isDefault: true
+    orgId: 1
+    uid: nats-system
+    jsonData:
+      natsUrl: nats://nats:4222
+      authentication: USERPASS
+      # see nats-server.conf
+      username: sys
+    secureJsonData:
+      # see nats-server.conf
+      password: pass

@@ -1,0 +1,139 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "target": {
+          "limit": 100,
+          "matchAny": false,
+          "tags": [],
+          "type": "dashboard"
+        },
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {
+        "type": "sandstormmedia-nats-datasource",
+        "uid": "nats-system"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto",
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 4,
+      "options": {
+        "footer": {
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "9.2.5",
+      "targets": [
+        {
+          "datasource": {
+            "type": "sandstormmedia-nats-datasource",
+            "uid": "nats-system"
+          },
+          "jqExpression": "",
+          "natsSubject": "$SYS.REQ.SERVER.PING",
+          "queryType": "REQUEST_REPLY",
+          "refId": "A",
+          "requestTimeout": "10s"
+        }
+      ],
+      "title": "Panel Title",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "sandstormmedia-nats-datasource",
+        "uid": "nats-default"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "id": 2,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "# Documentation\n\nStatistics from the NATS server, by checking out subjects from [here](https://docs.nats.io/running-a-nats-service/configuration/sys_accounts#available-events-and-services)\n\n\n## Developing this panel\n\n\n```\n# get general infos\nnats --user=sys --password=pass request '$SYS.REQ.SERVER.PING' ''\nnats --user=sys --password=pass request '$SYS.REQ.SERVER.PING.VARZ' ''\nnats --user=sys --password=pass request '$SYS.REQ.SERVER.PING.CONNZ' ''\n```",
+        "mode": "markdown"
+      },
+      "pluginVersion": "9.2.5",
+      "title": "Panel Title",
+      "type": "text"
+    }
+  ],
+  "schemaVersion": 37,
+  "style": "dark",
+  "tags": [],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "NATS Statistics",
+  "uid": "OCqagroVk",
+  "version": 4,
+  "weekStart": ""
+}

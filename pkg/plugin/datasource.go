@@ -119,11 +119,11 @@ func (d *Datasource) query(_ context.Context, pCtx backend.PluginContext, query 
 		return backend.ErrDataResponse(backend.StatusBadRequest, "json unmarshal: "+err.Error())
 	}
 
-	if qm.RequestTimeout == 0 {
-		qm.RequestTimeout = 5 * time.Second
+	if qm.RequestTimeout.Duration == 0 {
+		qm.RequestTimeout.Duration = 5 * time.Second
 	}
 	if qm.QueryType == QueryTypeRequestReply {
-		resp, err := natsConn.Request(qm.NatsSubject, []byte(qm.RequestData), qm.RequestTimeout)
+		resp, err := natsConn.Request(qm.NatsSubject, []byte(qm.RequestData), qm.RequestTimeout.Duration)
 		if err != nil {
 			return backend.ErrDataResponse(backend.StatusBadRequest, "NATS request error: "+err.Error())
 		}
