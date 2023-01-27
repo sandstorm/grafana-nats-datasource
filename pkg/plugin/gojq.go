@@ -23,8 +23,8 @@ func processViaGojq(v interface{}, jqExpression string) (*data.Frame, error) {
 	var isMultiValued bool
 	// filled if isMultiValue = true
 	var multiValueRow []map[string]interface{}
-	nilValues := make(map[string][]*interface{})
-	typeOfColumn := make(map[string]reflect.Type)
+	//nilValues := make(map[string][]*interface{})
+	//typeOfColumn := make(map[string]reflect.Type)
 
 	// filled if isMultiValue = false
 	var singleValueField *data.Field
@@ -68,7 +68,7 @@ func processViaGojq(v interface{}, jqExpression string) (*data.Frame, error) {
 		// 2) Add current element to data storage
 		if isMultiValued {
 			vMap := v.(map[string]interface{})
-			for key, val := range vMap {
+			/*for key, val := range vMap {
 				// remove NIL values, as framestruct.ToDataFrame cannot infer the type then (if this occurs in the first row)
 				if val == nil {
 					delete(vMap, key)
@@ -82,7 +82,7 @@ func processViaGojq(v interface{}, jqExpression string) (*data.Frame, error) {
 						return nil, fmt.Errorf(`type mismatch in row %d and field %s. Detected from first row: %v. Actual in this row: %v`, i, key, typeOfColumn[key], reflect.TypeOf(v))
 					}
 				}
-			}
+			}*/
 			multiValueRow = append(multiValueRow, vMap)
 		} else {
 			singleValueField.Append(v)
