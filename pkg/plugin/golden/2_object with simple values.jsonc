@@ -1,0 +1,75 @@
+//  🌟 This was machine generated.  Do not edit. 🌟
+//  
+//  Frame[0] 
+//  Name: response
+//  Dimensions: 4 Fields by 1 Rows
+//  +---------------+------------------+------------------+-----------------+
+//  | Name: b1      | Name: f1         | Name: i1         | Name: s1        |
+//  | Labels:       | Labels:          | Labels:          | Labels:         |
+//  | Type: []*bool | Type: []*float64 | Type: []*float64 | Type: []*string |
+//  +---------------+------------------+------------------+-----------------+
+//  | true          | 42               | 42               | my string       |
+//  +---------------+------------------+------------------+-----------------+
+//  
+//  
+//  🌟 This was machine generated.  Do not edit. 🌟
+{
+  "status": 200,
+  "frames": [
+    {
+      "schema": {
+        "name": "response",
+        "fields": [
+          {
+            "name": "b1",
+            "type": "boolean",
+            "typeInfo": {
+              "frame": "bool",
+              "nullable": true
+            }
+          },
+          {
+            "name": "f1",
+            "type": "number",
+            "typeInfo": {
+              "frame": "float64",
+              "nullable": true
+            }
+          },
+          {
+            "name": "i1",
+            "type": "number",
+            "typeInfo": {
+              "frame": "float64",
+              "nullable": true
+            }
+          },
+          {
+            "name": "s1",
+            "type": "string",
+            "typeInfo": {
+              "frame": "string",
+              "nullable": true
+            }
+          }
+        ]
+      },
+      "data": {
+        "values": [
+          [
+            true
+          ],
+          [
+            42
+          ],
+          [
+            42
+          ],
+          [
+            "my string"
+          ]
+        ]
+      }
+    }
+  ]
+}

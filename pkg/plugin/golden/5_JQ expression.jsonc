@@ -1,0 +1,44 @@
+//  🌟 This was machine generated.  Do not edit. 🌟
+//  
+//  Frame[0] 
+//  Name: response
+//  Dimensions: 1 Fields by 2 Rows
+//  +------------------+
+//  | Name: id         |
+//  | Labels:          |
+//  | Type: []*float64 |
+//  +------------------+
+//  | 42               |
+//  | 21               |
+//  +------------------+
+//  
+//  
+//  🌟 This was machine generated.  Do not edit. 🌟
+{
+  "status": 200,
+  "frames": [
+    {
+      "schema": {
+        "name": "response",
+        "fields": [
+          {
+            "name": "id",
+            "type": "number",
+            "typeInfo": {
+              "frame": "float64",
+              "nullable": true
+            }
+          }
+        ]
+      },
+      "data": {
+        "values": [
+          [
+            42,
+            21
+          ]
+        ]
+      }
+    }
+  ]
+}

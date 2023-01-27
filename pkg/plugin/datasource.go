@@ -6,11 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
-	"github.com/grafana/grafana-plugin-sdk-go/data/framestruct"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
@@ -137,8 +135,6 @@ func (d *Datasource) query(_ context.Context, pCtx backend.PluginContext, query 
 }
 
 func convertJsonBytesToResponse(respData []byte, jqExpression string) backend.DataResponse {
-	var response backend.DataResponse
-
 	// Get slice of data with optional leading whitespace removed.
 	// See RFC 7159, Section 2 for the definition of JSON whitespace.
 	x := bytes.TrimLeft(respData, " \t\r\n")
@@ -146,59 +142,48 @@ func convertJsonBytesToResponse(respData []byte, jqExpression string) backend.Da
 	isObject := len(x) > 0 && x[0] == '{'
 	var frame *data.Frame
 	var err error
+	log.DefaultLogger.Info(fmt.Sprintf("Converting JSON bytes to response. isArray=%v, isObj=%v", isArray, isObject))
 
 	if isArray {
-		if strings.TrimSpace(jqExpression) != "" {
-			var v []interface{}
-			if err := json.Unmarshal(respData, &v); err != nil {
-				return backend.ErrDataResponse(backend.StatusBadRequest, "JSON could not be parsed: "+err.Error())
-			}
-			v, err := processViaGojq(v, jqExpression)
-			if err != nil {
-				return backend.ErrDataResponse(backend.StatusBadRequest, fmt.Sprintf("JQ transfer did not work: %s", err.Error()))
-			}
-			frame, err = framestruct.ToDataFrame("response", v)
-		} else {
-			var v []map[string]interface{}
-			if err := json.Unmarshal(respData, &v); err != nil {
-				return backend.ErrDataResponse(backend.StatusBadRequest, "JSON could not be parsed: "+err.Error())
-			}
-			frame, err = framestruct.ToDataFrame("response", v)
+		if jqExpression == "" {
+			// pass all array values (even single-value ones) through JQ - to simplify code paths.
+			jqExpression = ".[]"
 		}
+		var v []interface{}
+		if err := json.Unmarshal(respData, &v); err != nil {
+			return backend.ErrDataResponse(backend.StatusBadRequest, "JSON could not be parsed: "+err.Error())
+		}
+		frame, err = processViaGojq(v, jqExpression)
 		if err != nil {
-			return backend.ErrDataResponse(backend.StatusBadRequest, fmt.Sprintf("JSON could not be converted to DataFrame: %s", err.Error()))
+			log.DefaultLogger.Error(fmt.Sprintf("Error processing array: %s", err))
+			return backend.ErrDataResponse(backend.StatusBadRequest, fmt.Sprintf("JQ transfer did not work: %s", err.Error()))
 		}
 	} else if isObject {
-		if strings.TrimSpace(jqExpression) != "" {
-			var v interface{}
-			if err := json.Unmarshal(respData, &v); err != nil {
-				return backend.ErrDataResponse(backend.StatusBadRequest, "JSON could not be parsed: "+err.Error())
-			}
-			v, err := processViaGojq(v, jqExpression)
-			if err != nil {
-				return backend.ErrDataResponse(backend.StatusBadRequest, fmt.Sprintf("JQ transfer did not work: %s", err.Error()))
-			}
-			frame, err = framestruct.ToDataFrame("response", v)
-		} else {
-			var v map[string]interface{}
-			if err := json.Unmarshal(respData, &v); err != nil {
-				return backend.ErrDataResponse(backend.StatusBadRequest, "JSON could not be parsed: "+err.Error())
-			}
-			frame, err = framestruct.ToDataFrame("response", v)
+		if jqExpression == "" {
+			// pass all object values through JQ - to simplify code paths.
+			jqExpression = "."
 		}
+		var v interface{}
+		if err := json.Unmarshal(respData, &v); err != nil {
+			return backend.ErrDataResponse(backend.StatusBadRequest, "JSON could not be parsed: "+err.Error())
+		}
+		frame, err = processViaGojq(v, jqExpression)
 		if err != nil {
-			return backend.ErrDataResponse(backend.StatusBadRequest, fmt.Sprintf("JSON could not be converted to DataFrame: %s", err.Error()))
+			log.DefaultLogger.Error(fmt.Sprintf("Error processing object: %s", err))
+			return backend.ErrDataResponse(backend.StatusBadRequest, fmt.Sprintf("JQ transfer did not work: %s", err.Error()))
 		}
 	} else {
 		// not an array nor an object. Respond with a single-column "result" string dataframe.
 		frame = data.NewFrame("response")
-		frame.Fields = append(frame.Fields, data.NewField("response", nil, []json.RawMessage{respData}))
+		frame.Fields = append(frame.Fields, data.NewField(data.TimeSeriesValueFieldName, nil, []string{string(respData)}))
 	}
 
-	// add the frames to the response.
-	response.Frames = append(response.Frames, frame)
-
-	return response
+	return backend.DataResponse{
+		Frames: data.Frames{
+			frame,
+		},
+		Status: backend.StatusOK,
+	}
 }
 
 // CheckHealth handles health checks sent from Grafana to the plugin.

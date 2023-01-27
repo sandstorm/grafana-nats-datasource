@@ -1,0 +1,41 @@
+//  🌟 This was machine generated.  Do not edit. 🌟
+//  
+//  Frame[0] 
+//  Name: response
+//  Dimensions: 1 Fields by 1 Rows
+//  +----------------+
+//  | Name: Value    |
+//  | Labels:        |
+//  | Type: []string |
+//  +----------------+
+//  | value1         |
+//  +----------------+
+//  
+//  
+//  🌟 This was machine generated.  Do not edit. 🌟
+{
+  "status": 200,
+  "frames": [
+    {
+      "schema": {
+        "name": "response",
+        "fields": [
+          {
+            "name": "Value",
+            "type": "string",
+            "typeInfo": {
+              "frame": "string"
+            }
+          }
+        ]
+      },
+      "data": {
+        "values": [
+          [
+            "value1"
+          ]
+        ]
+      }
+    }
+  ]
+}
