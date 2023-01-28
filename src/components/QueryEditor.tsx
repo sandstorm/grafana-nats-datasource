@@ -56,11 +56,11 @@ export class QueryEditor extends PureComponent<Props> {
                     </InlineField>
                 </div>
                 <div className="gf-form">
-                    <InlineField label="Optional JQ Processing Expression">
+                    <InlineField label="Optional Tamarin Processing Function">
                         <TextArea
                             className="width-27"
-                            value={query.jqExpression}
-                            onChange={onChange(this.props, 'jqExpression')}
+                            value={query.tamarinFn}
+                            onChange={onChange(this.props, 'tamarinFn')}
                         />
                     </InlineField>
                 </div>

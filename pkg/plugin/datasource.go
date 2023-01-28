@@ -10,6 +10,8 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/live"
 	"github.com/jellydator/ttlcache/v3"
 	"github.com/nats-io/nats.go"
+	"github.com/sandstormmedia/nats/pkg/plugin/framestruct"
+	"github.com/sandstormmedia/nats/pkg/plugin/tamarin"
 	"sync"
 	"time"
 
@@ -35,47 +37,9 @@ var (
 // NewDatasource creates a new datasource instance.
 func NewDatasource(config backend.DataSourceInstanceSettings) (instancemgmt.Instance, error) {
 	return &Datasource{
-		uid: config.UID,
+		uid:          config.UID,
+		natsConnOnce: new(sync.Once),
 	}, nil
-}
-
-// Datasource is an example datasource which can respond to data queries, reports
-// its health and has streaming skills.
-type Datasource struct {
-	uid      string
-	streamResponsesSoFar ttlcache.Cache[string,] ttlcache.New[string, string]()
-	streamMu sync.RWMutex
-	streams  map[string]models.TwinMakerQuery
-}
-
-type streamResponse {
-
-}
-
-func (ds *Datasource) SubscribeStream(ctx context.Context, request *backend.SubscribeStreamRequest) (*backend.SubscribeStreamResponse, error) {
-	status := backend.SubscribeStreamStatusNotFound
-
-	ds.streamMu.RLock()
-	if _, ok := ds.streams[request.Path]; ok {
-		status = backend.SubscribeStreamStatusOK
-	}
-	ds.streamMu.RUnlock()
-
-	return &backend.SubscribeStreamResponse{
-		Status: status,
-	}, nil
-}
-
-func (ds *Datasource) PublishStream(ctx context.Context, request *backend.PublishStreamRequest) (*backend.PublishStreamResponse, error) {
-	return &backend.PublishStreamResponse{
-		Status: backend.PublishStreamStatusPermissionDenied,
-	}, nil
-}
-
-func (ds *Datasource) RunStream(ctx context.Context, request *backend.RunStreamRequest, sender *backend.StreamSender) error {
-	sender.SendFrame(frame, data.IncludeAll)
-	//TODO implement me
-	panic("implement me")
 }
 
 // Dispose here tells plugin SDK that plugin wants to clean up resources when a new instance
@@ -83,6 +47,75 @@ func (ds *Datasource) RunStream(ctx context.Context, request *backend.RunStreamR
 // be disposed and a new one will be created using NewSampleDatasource factory function.
 func (ds *Datasource) Dispose() {
 	// Clean up datasource instance resources.
+}
+
+// Datasource is an example datasource which can respond to data queries, reports
+// its health and has streaming skills.
+type Datasource struct {
+	uid                  string
+	streamResponsesSoFar ttlcache.Cache[string, *streamResponse]
+
+	// natsConnOnce is implementation detail of connectNats to ensure we only create one NATS connection without any race conditions
+	natsConnOnce *sync.Once
+	// natsConn contains the singleton NATS connection for the datasource. Never access this directly, but always use connectNats.
+	natsConn *nats.Conn
+	// natsConnErr contains the error if creating the NATS connection failed. Never access this directly, but always use connectNats.
+	natsConnErr error
+}
+
+type streamResponse struct {
+	onNewMessages chan bool
+	currentFrame  *data.Frame
+	currentErr    error
+}
+
+func (ds *Datasource) SubscribeStream(ctx context.Context, request *backend.SubscribeStreamRequest) (*backend.SubscribeStreamResponse, error) {
+	status := backend.SubscribeStreamStatusNotFound
+
+	value := ds.streamResponsesSoFar.Get(request.Path)
+	if value != nil {
+		// found the stream, so we can subscribe to it.
+		status = backend.SubscribeStreamStatusOK
+	}
+	return &backend.SubscribeStreamResponse{
+		Status: status,
+	}, nil
+}
+
+func (ds *Datasource) PublishStream(ctx context.Context, request *backend.PublishStreamRequest) (*backend.PublishStreamResponse, error) {
+	// we do not allow any write operation from the frontend (so far)
+	return &backend.PublishStreamResponse{
+		Status: backend.PublishStreamStatusPermissionDenied,
+	}, nil
+}
+
+func (ds *Datasource) RunStream(ctx context.Context, request *backend.RunStreamRequest, sender *backend.StreamSender) error {
+	value := ds.streamResponsesSoFar.Get(request.Path)
+	if value != nil {
+		for {
+			select {
+			case <-ctx.Done():
+				// we are done.
+				// TODO: close NATS subscription!
+				return nil
+			case <-value.Value().onNewMessages:
+				// new message
+				if value.Value().currentErr != nil {
+					// error while processing messages -> exit stream
+					return value.Value().currentErr
+				}
+
+				// no eror -> send the updated frame to the user.
+				err := sender.SendFrame(value.Value().currentFrame, data.IncludeAll)
+				if err != nil {
+					// TODO: close NATS subscription!
+					return value.Value().currentErr
+				}
+			}
+		}
+		return nil
+	}
+	return fmt.Errorf("no data found for stream %s", request.Path)
 }
 
 // QueryData handles multiple queries and returns multiple responses.
@@ -128,7 +161,7 @@ func (ds *Datasource) loadDataSourceOptions(pCtx backend.PluginContext) (*MyData
 	return dataSourceOptions, dataSourceSecureOptions, nil
 }
 
-func (ds *Datasource) query(_ context.Context, pCtx backend.PluginContext, query backend.DataQuery) backend.DataResponse {
+func (ds *Datasource) query(ctx context.Context, pCtx backend.PluginContext, query backend.DataQuery) backend.DataResponse {
 	//////////////
 	// 1) Data Source option loading
 	//////////////
@@ -145,7 +178,7 @@ func (ds *Datasource) query(_ context.Context, pCtx backend.PluginContext, query
 		return backend.ErrDataResponse(backend.StatusBadRequest, "NATS connection error:  "+err.Error())
 	}
 	// TODO: lateron, keep the nats connection open for some minutes instead of tearing it down for every req.
-	defer natsConn.Close()
+	//defer natsConn.Close()
 
 	//////////////
 	// 3) do request
@@ -162,12 +195,7 @@ func (ds *Datasource) query(_ context.Context, pCtx backend.PluginContext, query
 		qm.RequestTimeout.Duration = 5 * time.Second
 	}
 	if qm.QueryType == QueryTypeRequestReply {
-		resp, err := natsConn.Request(qm.NatsSubject, []byte(qm.RequestData), qm.RequestTimeout.Duration)
-		if err != nil {
-			return backend.ErrDataResponse(backend.StatusBadRequest, "NATS request error: "+err.Error())
-		}
-
-		frame, err := convertJsonBytesToResponse(resp.Data, qm.JqExpression)
+		frame, err := ds.requestReply(ctx, natsConn, qm)
 		if err != nil {
 			return backend.ErrDataResponse(backend.StatusBadRequest, "Response conversion error: "+err.Error())
 		}
@@ -178,8 +206,8 @@ func (ds *Datasource) query(_ context.Context, pCtx backend.PluginContext, query
 			},
 			Status: backend.StatusOK,
 		}
-	} else if qm.QueryType == QueryTypeRequestMultireplyStreaming {
-		return ds.requestMultireplyStreaming(qm, query, pCtx, natsConn)
+	} else if qm.QueryType == QueryTypeSubscribe {
+		return ds.subscribe(ctx, qm, query, pCtx, natsConn)
 	} else {
 		return backend.ErrDataResponse(backend.StatusBadRequest, "Invalid Query Type: "+qm.QueryType)
 	}
@@ -269,34 +297,70 @@ func (ds *Datasource) CheckHealth(_ context.Context, req *backend.CheckHealthReq
 	}, nil
 }
 
-func (ds *Datasource) requestMultireplyStreaming(qm queryModel, query backend.DataQuery, pCtx backend.PluginContext, natsConn *nats.Conn) backend.DataResponse {
+func (ds *Datasource) requestReply(ctx context.Context, natsConn *nats.Conn, qm queryModel) (*data.Frame, error) {
+	resp, err := natsConn.Request(qm.NatsSubject, []byte(qm.RequestData), qm.RequestTimeout.Duration)
+	if err != nil {
+		return nil, err
+	}
+
+	return tamarin.ConvertMessage(ctx, resp, qm.TamarinFn)
+}
+
+// subscribe handles a NATS subscription call in streaming fashin.
+// TODO explain how done
+// inspired by https://github.com/grafana/grafana-iot-twinmaker-app/blob/0947ce1ff0afec8372cae624566726e68687137b/pkg/plugin/datasource.go
+func (ds *Datasource) subscribe(ctx context.Context, qm queryModel, query backend.DataQuery, pCtx backend.PluginContext, natsConn *nats.Conn) backend.DataResponse {
 	requestUuid := uuid.NewString()
+
+	var x map[string]interface{}
+	incrementalDataframe, err := framestruct.ToIncrementalDataFrame("response", x)
+
+	sr := &streamResponse{
+		onNewMessages: make(chan bool, 100), // we use a buffered channel here, because we do not want to block at all, if possible.
+		currentFrame:  incrementalDataframe.Frame(),
+	}
+
+	// TODO: do not hardcode TTL here.
+	ds.streamResponsesSoFar.Set(requestUuid, sr, 5*time.Minute)
+
+	i := 0
+	var subscription *nats.Subscription
+	subscription, err = natsConn.Subscribe(qm.NatsSubject, func(msg *nats.Msg) {
+		// extend TTL everytime we receive a msg.
+		ds.streamResponsesSoFar.Touch(requestUuid)
+		i++
+		convertedMessage, err := tamarin.ConvertMessage(ctx, msg, qm.TamarinFn)
+		if err != nil {
+			sr.currentErr = fmt.Errorf("could not convert message %d - error in tamarin script: %w", i, err)
+			sr.onNewMessages <- true
+			subscription.Unsubscribe()
+			return
+		}
+		err = incrementalDataframe.AddRow(convertedMessage)
+		if err != nil {
+			sr.currentErr = fmt.Errorf("could not convert message %d - could not be converted to data frame: %w", i, err)
+			sr.onNewMessages <- true
+			subscription.Unsubscribe()
+			return
+		}
+
+		// no error :) -> notify sender
+		sr.currentFrame = incrementalDataframe.Frame()
+		sr.onNewMessages <- true
+	})
+
+	if err != nil {
+		return backend.ErrDataResponse(backend.StatusBadRequest, "could not create subscription: "+err.Error())
+	}
+
+	// create an empty frame with the correct live channel
 	frame := data.NewFrame("response")
 	channel := live.Channel{
 		Scope:     live.ScopeDatasource,
 		Namespace: ds.uid,
-		Path:      requestUuid,
-	} // !! https://github.com/grafana/grafana-iot-twinmaker-app/blob/0947ce1ff0afec8372cae624566726e68687137b/pkg/plugin/datasource.go
-	// https://github.com/grafana/mqtt-datasource/blob/main/pkg/plugin/datasource.go
+		Path:      requestUuid, // because request UUID is random, we cannot snoop on other people's values (security). and we have one subscription per user (which is what we want in our case)
+	}
 	frame.SetMeta(&data.FrameMeta{Channel: channel.String()})
-
-	// we manually need
-	respInbox := natsConn.NewInbox()
-	responsesSoFar := make([][]byte, 0, 10)
-	natsConn.Subscribe(respInbox, func(msg *nats.Msg) {
-		// totally inefficient: for every new message, we parse the FULL response (with all already existing messages).
-		// TODO: this should be made more intelligent later :D
-		responsesSoFar = append(responsesSoFar, msg.Data)
-		var r = []byte("[")
-		r = append(r, bytes.Join(responsesSoFar, []byte(","))...)
-		r = append(r, []byte("]")...)
-
-		resp, _ := convertJsonBytesToResponse(r, qm.JqExpression)
-		ds.streamMu.Lock()
-		ds.streams[requestUuid] = resp
-		ds.streamMu.Unlock()
-	})
-
 	return backend.DataResponse{
 		Frames: data.Frames{
 			frame,

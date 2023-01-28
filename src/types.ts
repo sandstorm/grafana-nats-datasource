@@ -2,11 +2,14 @@ import {DataQuery, DataSourceJsonData} from '@grafana/data';
 // These need to be synced with types.go
 
 export interface MyQuery extends DataQuery {
-    queryType: "REQUEST_REPLY" | "REQUEST_MULTIREPLY_STREAMING";
+    queryType: "REQUEST_REPLY" | "SUBSCRIBE" | "SCRIPT";
     natsSubject: string;
     requestTimeout: string;
     requestData: string;
-    jqExpression: string;
+
+    // for REQUEST_REPLY and SUBSCRIBE, gets each individual message and can transform it.
+    // for SCRIPT, can take control of any flow.
+    tamarinFn: string;
 }
 
 export const QueryTypeOptions = [
@@ -15,8 +18,12 @@ export const QueryTypeOptions = [
         value: "REQUEST_REPLY"
     },
     {
-        label: "Request / Multi-Reply (streaming)",
-        value: "REQUEST_MULTIREPLY_STREAMING"
+        label: "Subscribe",
+        value: "SUBSCRIBE"
+    },
+    {
+        label: "Free-Form Script (advanced)",
+        value: "SCRIPT"
     }
 ];
 

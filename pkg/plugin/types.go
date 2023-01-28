@@ -25,14 +25,15 @@ type MySecureJsonData struct {
 }
 
 const QueryTypeRequestReply = "REQUEST_REPLY"
-const QueryTypeRequestMultireplyStreaming = "REQUEST_MULTIREPLY_STREAMING"
+const QueryTypeSubscribe = "SUBSCRIBE"
+const QueryTypeScript = "SCRIPT"
 
 type queryModel struct {
 	QueryType      string   `json:"queryType"`
 	NatsSubject    string   `json:"natsSubject"`
 	RequestTimeout Duration `json:"requestTimeout"`
 	RequestData    string   `json:"requestData"`
-	JqExpression   string   `json:"jqExpression"`
+	TamarinFn      string   `json:"tamarinFn"`
 }
 
 type Duration struct {
