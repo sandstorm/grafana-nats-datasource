@@ -5,10 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
+	"github.com/grafana/grafana-plugin-sdk-go/live"
+	"github.com/jellydator/ttlcache/v3"
 	"github.com/nats-io/nats.go"
-	"github.com/nats-io/nkeys"
-	"os"
+	"sync"
 	"time"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
@@ -26,23 +28,60 @@ var (
 	_ backend.CheckHealthHandler = (*Datasource)(nil)
 
 	// TODO: https://grafana.com/tutorials/build-a-streaming-data-source-plugin/
-	// _ backend.StreamHandler         = (*Datasource)(nil)
+	_ backend.StreamHandler         = (*Datasource)(nil)
 	_ instancemgmt.InstanceDisposer = (*Datasource)(nil)
 )
 
 // NewDatasource creates a new datasource instance.
-func NewDatasource(_ backend.DataSourceInstanceSettings) (instancemgmt.Instance, error) {
-	return &Datasource{}, nil
+func NewDatasource(config backend.DataSourceInstanceSettings) (instancemgmt.Instance, error) {
+	return &Datasource{
+		uid: config.UID,
+	}, nil
 }
 
 // Datasource is an example datasource which can respond to data queries, reports
 // its health and has streaming skills.
-type Datasource struct{}
+type Datasource struct {
+	uid      string
+	streamResponsesSoFar ttlcache.Cache[string,] ttlcache.New[string, string]()
+	streamMu sync.RWMutex
+	streams  map[string]models.TwinMakerQuery
+}
+
+type streamResponse {
+
+}
+
+func (ds *Datasource) SubscribeStream(ctx context.Context, request *backend.SubscribeStreamRequest) (*backend.SubscribeStreamResponse, error) {
+	status := backend.SubscribeStreamStatusNotFound
+
+	ds.streamMu.RLock()
+	if _, ok := ds.streams[request.Path]; ok {
+		status = backend.SubscribeStreamStatusOK
+	}
+	ds.streamMu.RUnlock()
+
+	return &backend.SubscribeStreamResponse{
+		Status: status,
+	}, nil
+}
+
+func (ds *Datasource) PublishStream(ctx context.Context, request *backend.PublishStreamRequest) (*backend.PublishStreamResponse, error) {
+	return &backend.PublishStreamResponse{
+		Status: backend.PublishStreamStatusPermissionDenied,
+	}, nil
+}
+
+func (ds *Datasource) RunStream(ctx context.Context, request *backend.RunStreamRequest, sender *backend.StreamSender) error {
+	sender.SendFrame(frame, data.IncludeAll)
+	//TODO implement me
+	panic("implement me")
+}
 
 // Dispose here tells plugin SDK that plugin wants to clean up resources when a new instance
 // created. As soon as datasource settings change detected by SDK old datasource instance will
 // be disposed and a new one will be created using NewSampleDatasource factory function.
-func (d *Datasource) Dispose() {
+func (ds *Datasource) Dispose() {
 	// Clean up datasource instance resources.
 }
 
@@ -50,7 +89,7 @@ func (d *Datasource) Dispose() {
 // req contains the queries []DataQuery (where each query contains RefID as a unique identifier).
 // The QueryDataResponse contains a map of RefID to the response for each query, and each response
 // contains Frames ([]*Frame).
-func (d *Datasource) QueryData(ctx context.Context, req *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
+func (ds *Datasource) QueryData(ctx context.Context, req *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
 	// when logging at a non-Debug level, make sure you don't include sensitive information in the message
 	// (like the *backend.QueryDataRequest)
 	log.DefaultLogger.Debug("QueryData called", "numQueries", len(req.Queries))
@@ -60,7 +99,7 @@ func (d *Datasource) QueryData(ctx context.Context, req *backend.QueryDataReques
 
 	// loop over queries and execute them individually.
 	for _, q := range req.Queries {
-		res := d.query(ctx, req.PluginContext, q)
+		res := ds.query(ctx, req.PluginContext, q)
 
 		// save the response in a hashmap
 		// based on with RefID as identifier
@@ -70,7 +109,7 @@ func (d *Datasource) QueryData(ctx context.Context, req *backend.QueryDataReques
 	return response, nil
 }
 
-func (d *Datasource) loadDataSourceOptions(pCtx backend.PluginContext) (*MyDataSourceOptions, *MySecureJsonData, error) {
+func (ds *Datasource) loadDataSourceOptions(pCtx backend.PluginContext) (*MyDataSourceOptions, *MySecureJsonData, error) {
 	var dataSourceOptions *MyDataSourceOptions
 	err := json.Unmarshal(pCtx.DataSourceInstanceSettings.JSONData, &dataSourceOptions)
 	if err != nil {
@@ -89,11 +128,11 @@ func (d *Datasource) loadDataSourceOptions(pCtx backend.PluginContext) (*MyDataS
 	return dataSourceOptions, dataSourceSecureOptions, nil
 }
 
-func (d *Datasource) query(_ context.Context, pCtx backend.PluginContext, query backend.DataQuery) backend.DataResponse {
+func (ds *Datasource) query(_ context.Context, pCtx backend.PluginContext, query backend.DataQuery) backend.DataResponse {
 	//////////////
 	// 1) Data Source option loading
 	//////////////
-	dataSourceOptions, dataSourceSecureOptions, err := d.loadDataSourceOptions(pCtx)
+	dataSourceOptions, dataSourceSecureOptions, err := ds.loadDataSourceOptions(pCtx)
 	if err != nil {
 		return backend.ErrDataResponse(backend.StatusBadRequest, "data source could not be loaded: "+err.Error())
 	}
@@ -101,7 +140,7 @@ func (d *Datasource) query(_ context.Context, pCtx backend.PluginContext, query 
 	//////////////
 	// 2) Connect
 	//////////////
-	natsConn, err := d.connectNats(dataSourceOptions, dataSourceSecureOptions)
+	natsConn, err := ds.connectNats(dataSourceOptions, dataSourceSecureOptions)
 	if err != nil {
 		return backend.ErrDataResponse(backend.StatusBadRequest, "NATS connection error:  "+err.Error())
 	}
@@ -128,13 +167,25 @@ func (d *Datasource) query(_ context.Context, pCtx backend.PluginContext, query 
 			return backend.ErrDataResponse(backend.StatusBadRequest, "NATS request error: "+err.Error())
 		}
 
-		return convertJsonBytesToResponse(resp.Data, qm.JqExpression)
+		frame, err := convertJsonBytesToResponse(resp.Data, qm.JqExpression)
+		if err != nil {
+			return backend.ErrDataResponse(backend.StatusBadRequest, "Response conversion error: "+err.Error())
+		}
+
+		return backend.DataResponse{
+			Frames: data.Frames{
+				frame,
+			},
+			Status: backend.StatusOK,
+		}
+	} else if qm.QueryType == QueryTypeRequestMultireplyStreaming {
+		return ds.requestMultireplyStreaming(qm, query, pCtx, natsConn)
 	} else {
 		return backend.ErrDataResponse(backend.StatusBadRequest, "Invalid Query Type: "+qm.QueryType)
 	}
 }
 
-func convertJsonBytesToResponse(respData []byte, jqExpression string) backend.DataResponse {
+func convertJsonBytesToResponse(respData []byte, jqExpression string) (*data.Frame, error) {
 	// Get slice of data with optional leading whitespace removed.
 	// See RFC 7159, Section 2 for the definition of JSON whitespace.
 	x := bytes.TrimLeft(respData, " \t\r\n")
@@ -151,12 +202,11 @@ func convertJsonBytesToResponse(respData []byte, jqExpression string) backend.Da
 		}
 		var v []interface{}
 		if err := json.Unmarshal(respData, &v); err != nil {
-			return backend.ErrDataResponse(backend.StatusBadRequest, "JSON could not be parsed: "+err.Error())
+			return nil, fmt.Errorf("JSON could not be parsed (1): %w", err)
 		}
 		frame, err = processViaGojq(v, jqExpression)
 		if err != nil {
-			log.DefaultLogger.Error(fmt.Sprintf("Error processing array: %s", err))
-			return backend.ErrDataResponse(backend.StatusBadRequest, fmt.Sprintf("JQ transfer did not work: %s", err.Error()))
+			return nil, fmt.Errorf("JQ could not process array: %w", err)
 		}
 	} else if isObject {
 		if jqExpression == "" {
@@ -165,12 +215,12 @@ func convertJsonBytesToResponse(respData []byte, jqExpression string) backend.Da
 		}
 		var v interface{}
 		if err := json.Unmarshal(respData, &v); err != nil {
-			return backend.ErrDataResponse(backend.StatusBadRequest, "JSON could not be parsed: "+err.Error())
+			return nil, fmt.Errorf("JSON could not be parsed (2): %w", err)
 		}
 		frame, err = processViaGojq(v, jqExpression)
 		if err != nil {
 			log.DefaultLogger.Error(fmt.Sprintf("Error processing object: %s", err))
-			return backend.ErrDataResponse(backend.StatusBadRequest, fmt.Sprintf("JQ transfer did not work: %s", err.Error()))
+			return nil, fmt.Errorf("JQ could not process object: %w", err)
 		}
 	} else {
 		// not an array nor an object. Respond with a single-column "result" string dataframe.
@@ -178,19 +228,14 @@ func convertJsonBytesToResponse(respData []byte, jqExpression string) backend.Da
 		frame.Fields = append(frame.Fields, data.NewField(data.TimeSeriesValueFieldName, nil, []string{string(respData)}))
 	}
 
-	return backend.DataResponse{
-		Frames: data.Frames{
-			frame,
-		},
-		Status: backend.StatusOK,
-	}
+	return frame, nil
 }
 
 // CheckHealth handles health checks sent from Grafana to the plugin.
 // The main use case for these health checks is the test button on the
 // datasource configuration page which allows users to verify that
 // a datasource is working as expected.
-func (d *Datasource) CheckHealth(_ context.Context, req *backend.CheckHealthRequest) (*backend.CheckHealthResult, error) {
+func (ds *Datasource) CheckHealth(_ context.Context, req *backend.CheckHealthRequest) (*backend.CheckHealthResult, error) {
 	// when logging at a non-Debug level, make sure you don't include sensitive information in the message
 	// (like the *backend.QueryDataRequest)
 	log.DefaultLogger.Debug("CheckHealth called")
@@ -198,7 +243,7 @@ func (d *Datasource) CheckHealth(_ context.Context, req *backend.CheckHealthRequ
 	//////////////
 	// 1) Data Source option loading
 	//////////////
-	dataSourceOptions, dataSourceSecureOptions, err := d.loadDataSourceOptions(req.PluginContext)
+	dataSourceOptions, dataSourceSecureOptions, err := ds.loadDataSourceOptions(req.PluginContext)
 	if err != nil {
 		return &backend.CheckHealthResult{
 			Status:  backend.HealthStatusError,
@@ -209,7 +254,7 @@ func (d *Datasource) CheckHealth(_ context.Context, req *backend.CheckHealthRequ
 	//////////////
 	// 2) Connect
 	//////////////
-	natsConn, err := d.connectNats(dataSourceOptions, dataSourceSecureOptions)
+	natsConn, err := ds.connectNats(dataSourceOptions, dataSourceSecureOptions)
 	if err != nil {
 		return &backend.CheckHealthResult{
 			Status:  backend.HealthStatusError,
@@ -224,48 +269,38 @@ func (d *Datasource) CheckHealth(_ context.Context, req *backend.CheckHealthRequ
 	}, nil
 }
 
-func (d *Datasource) connectNats(options *MyDataSourceOptions, secureOptions *MySecureJsonData) (*nats.Conn, error) {
-	var natsConn *nats.Conn
-	var err error
-	if options.Authentication == AuthenticationNone {
-		natsConn, err = nats.Connect(options.NatsUrl)
-	} else if options.Authentication == AuthenticationNkey {
-		natsConn, err = nats.Connect(options.NatsUrl, nats.Nkey(
-			options.Nkey,
-			func(nonce []byte) ([]byte, error) {
-				kp, err := nkeys.FromSeed([]byte(secureOptions.NkeySeed))
-				if err != nil {
-					return nil, fmt.Errorf("unable to load key pair from NkeySeed: %w", err)
-				}
-				// Wipe our key on exit.
-				defer kp.Wipe()
+func (ds *Datasource) requestMultireplyStreaming(qm queryModel, query backend.DataQuery, pCtx backend.PluginContext, natsConn *nats.Conn) backend.DataResponse {
+	requestUuid := uuid.NewString()
+	frame := data.NewFrame("response")
+	channel := live.Channel{
+		Scope:     live.ScopeDatasource,
+		Namespace: ds.uid,
+		Path:      requestUuid,
+	} // !! https://github.com/grafana/grafana-iot-twinmaker-app/blob/0947ce1ff0afec8372cae624566726e68687137b/pkg/plugin/datasource.go
+	// https://github.com/grafana/mqtt-datasource/blob/main/pkg/plugin/datasource.go
+	frame.SetMeta(&data.FrameMeta{Channel: channel.String()})
 
-				sig, _ := kp.Sign(nonce)
-				return sig, nil
-			},
-		))
-	} else if options.Authentication == AuthenticationUserPass {
-		natsConn, err = nats.Connect(options.NatsUrl, nats.UserInfo(options.Username, secureOptions.Password))
-	} else if options.Authentication == AuthenticationJWT {
-		// WORKAROUND: store credentials in a temp-file
-		file, err := os.CreateTemp("", "tmp-jwt")
-		if err != nil {
-			return nil, fmt.Errorf("TODO: %w", err)
-		}
-		defer os.Remove(file.Name())
-		_, err = file.Write([]byte(secureOptions.Jwt))
-		if err != nil {
-			return nil, fmt.Errorf("TODO: %w", err)
-		}
-		if err := file.Close(); err != nil {
-			return nil, fmt.Errorf("TODO: %w", err)
-		}
+	// we manually need
+	respInbox := natsConn.NewInbox()
+	responsesSoFar := make([][]byte, 0, 10)
+	natsConn.Subscribe(respInbox, func(msg *nats.Msg) {
+		// totally inefficient: for every new message, we parse the FULL response (with all already existing messages).
+		// TODO: this should be made more intelligent later :D
+		responsesSoFar = append(responsesSoFar, msg.Data)
+		var r = []byte("[")
+		r = append(r, bytes.Join(responsesSoFar, []byte(","))...)
+		r = append(r, []byte("]")...)
 
-		natsConn, err = nats.Connect(options.NatsUrl, nats.UserCredentials(file.Name()))
-	} else {
-		// TODO: TOKEN AUTH
-		return nil, fmt.Errorf("TODO")
+		resp, _ := convertJsonBytesToResponse(r, qm.JqExpression)
+		ds.streamMu.Lock()
+		ds.streams[requestUuid] = resp
+		ds.streamMu.Unlock()
+	})
+
+	return backend.DataResponse{
+		Frames: data.Frames{
+			frame,
+		},
+		Status: backend.StatusOK,
 	}
-
-	return natsConn, err
 }

@@ -25,6 +25,7 @@ type MySecureJsonData struct {
 }
 
 const QueryTypeRequestReply = "REQUEST_REPLY"
+const QueryTypeRequestMultireplyStreaming = "REQUEST_MULTIREPLY_STREAMING"
 
 type queryModel struct {
 	QueryType      string   `json:"queryType"`

@@ -89,7 +89,7 @@ func TestValidJsonResponses(t *testing.T) {
 
 	for _, testcase := range cases {
 		t.Run(testcase.name, func(t *testing.T) {
-			res := convertJsonBytesToResponse([]byte(testcase.inputJson), testcase.jqExpression)
+			res, _ := convertJsonBytesToResponse([]byte(testcase.inputJson), testcase.jqExpression)
 			AssertEqual(t, backend.StatusOK, res.Status, "res.Status")
 			AssertNoError(t, res.Error)
 			// TODO: make updateFile configurable

@@ -42,6 +42,7 @@ https://grafana.com/docs/grafana/latest/developers/plugins/data-frames/
 https://grafana.com/docs/grafana/latest/developers/plugins/development-with-local-grafana/
 https://grafana.com/tutorials/build-a-data-source-plugin/
 https://grafana.com/tutorials/build-a-streaming-data-source-plugin/
+   - https://grafana.com/docs/grafana/latest/setup-grafana/set-up-grafana-live/
 
 
 

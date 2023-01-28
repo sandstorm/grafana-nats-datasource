@@ -110,6 +110,7 @@ func processViaGojq(v interface{}, jqExpression string) (*data.Frame, error) {
 		// single-value fields are already a field at this point.
 		frame := data.NewFrame("response")
 		frame.Fields = append(frame.Fields, singleValueField)
+		// TODO: frame.Meta.Channel ds/<DATASOURCE_UID>/<CUSTOM_PATH>.
 		return frame, nil
 	}
 }

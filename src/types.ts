@@ -2,7 +2,7 @@ import {DataQuery, DataSourceJsonData} from '@grafana/data';
 // These need to be synced with types.go
 
 export interface MyQuery extends DataQuery {
-    queryType: "REQUEST_REPLY";
+    queryType: "REQUEST_REPLY" | "REQUEST_MULTIREPLY_STREAMING";
     natsSubject: string;
     requestTimeout: string;
     requestData: string;
@@ -13,6 +13,10 @@ export const QueryTypeOptions = [
     {
         label: "Request/Reply",
         value: "REQUEST_REPLY"
+    },
+    {
+        label: "Request / Multi-Reply (streaming)",
+        value: "REQUEST_MULTIREPLY_STREAMING"
     }
 ];
 
