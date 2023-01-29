@@ -17,6 +17,13 @@ func ConvertMessage(ctx context.Context, msg *nats.Msg, tamarinFn string) (*data
 		tamarinFn = `
 			json.unmarshal(msg.Data)
 		`
+		// return {"foo": "bar", x: 42, y: 12}
+		//
+		//
+		// x := json.unmarshal(msg.Data).unwrap()
+		//x["a"] = 42
+		//return x
+
 	}
 	registry, err := object.NewTypeRegistry(object.TypeRegistryOpts{
 		Converters: []object.TypeConverter{
