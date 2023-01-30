@@ -37,8 +37,9 @@ var (
 // NewDatasource creates a new datasource instance.
 func NewDatasource(config backend.DataSourceInstanceSettings) (instancemgmt.Instance, error) {
 	return &Datasource{
-		uid:          config.UID,
-		natsConnOnce: new(sync.Once),
+		uid:                  config.UID,
+		natsConnOnce:         new(sync.Once),
+		streamResponsesSoFar: ttlcache.New[string, *streamResponse](),
 	}, nil
 }
 
@@ -53,7 +54,7 @@ func (ds *Datasource) Dispose() {
 // its health and has streaming skills.
 type Datasource struct {
 	uid                  string
-	streamResponsesSoFar ttlcache.Cache[string, *streamResponse]
+	streamResponsesSoFar *ttlcache.Cache[string, *streamResponse]
 
 	// natsConnOnce is implementation detail of connectNats to ensure we only create one NATS connection without any race conditions
 	natsConnOnce *sync.Once
