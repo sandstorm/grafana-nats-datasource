@@ -36,7 +36,7 @@ export function TamarinCodeEditorField({expression: expression, onChange}: React
             const updateElementHeight = () => {
                 const containerDiv = containerRef.current;
                 if (containerDiv !== null && editor.getContentHeight() < 200) {
-                    const pixelHeight = Math.max(32, editor.getContentHeight());
+                    const pixelHeight = Math.max(100, editor.getContentHeight());
                     containerDiv.style.height = `${pixelHeight}px`;
                     containerDiv.style.width = '100%';
                     const pixelWidth = containerDiv.clientWidth;
@@ -51,7 +51,7 @@ export function TamarinCodeEditorField({expression: expression, onChange}: React
     );
 
     return (
-        <div ref={containerRef}>
+        <div ref={containerRef} style={{width: '100%'}}>
             <CodeEditor
                 monacoOptions={{
                     // without this setting, the auto-resize functionality causes an infinite loop, don't remove it!
@@ -59,7 +59,7 @@ export function TamarinCodeEditorField({expression: expression, onChange}: React
 
                     // These additional options are style focused and are a subset of those in the query editor in Prometheus
                     fontSize: 14,
-                    lineNumbers: 'off',
+                    lineNumbers: "on",
                     renderLineHighlight: 'none',
                     scrollbar: {
                         vertical: 'hidden',

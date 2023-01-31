@@ -1,7 +1,7 @@
 // inspired by https://github.com/grafana/grafana/blob/78184f37c444bd8c36437498bde365a6a81bb71d/public/app/plugins/datasource/cloudwatch/language/metric-math/language.ts
 // and https://github.com/cloudcmds/tamarin/blob/3de571dcd2f3b869ec6819366944d9a74182eebd/vscode/syntaxes/tamarin.grammar.json
 // and https://github.com/microsoft/monaco-editor/blob/main/src/basic-languages/go/go.ts
-
+// see https://microsoft.github.io/monaco-editor/monarch.html
 
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.

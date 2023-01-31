@@ -13,9 +13,14 @@ import (
 )
 
 func createTamarinScope(msg *nats.Msg) (*scope.Scope, error) {
-	registry, err := object.NewTypeRegistry(object.TypeRegistryOpts{
+	var registry object.GoTypeRegistry
+	var err error
+	registry, err = object.NewTypeRegistry(object.TypeRegistryOpts{
 		Converters: []object.TypeConverter{
 			bytesConverter{},
+			natsHeadersConverter{
+				registry: &registry,
+			},
 		},
 	})
 	if err != nil {

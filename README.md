@@ -42,7 +42,18 @@ https://grafana.com/docs/grafana/latest/developers/plugins/data-frames/
 https://grafana.com/docs/grafana/latest/developers/plugins/development-with-local-grafana/
 https://grafana.com/tutorials/build-a-data-source-plugin/
 https://grafana.com/tutorials/build-a-streaming-data-source-plugin/
-   - https://grafana.com/docs/grafana/latest/setup-grafana/set-up-grafana-live/
+- https://grafana.com/docs/grafana/latest/setup-grafana/set-up-grafana-live/
+
+UI Components
+- https://developers.grafana.com/ui/latest/index.html?path=/story/forms-cascader-buttoncascader--simple
+- https://github.com/grafana/grafana/tree/main/packages/grafana-ui/src/components
+
+https://github.com/cloudcmds/tamarin
+https://github.com/cloudcmds/tamarin/blob/3de571dcd2f3b869ec6819366944d9a74182eebd/vscode/syntaxes/tamarin.grammar.json
+https://github.com/grafana/grafana/blob/58a41af3f34082987c8ccebb4565cc20b4cee1b8/public/app/plugins/datasource/loki/components/monaco-query-field/MonacoQueryField.tsx
+
+TODO https://blog.checklyhq.com/customizing-monaco/
+https://microsoft.github.io/monaco-editor/monarch.html
 
 
 
