@@ -218,7 +218,7 @@ export class QueryEditor extends PureComponent<Props> {
                     <Field label={explanation.tamarinLabel} style={{width: '100%'}}
                            description={explanation.tamarinDescription}>
                         <TamarinCodeEditorField
-                            expression={query.tamarinFn}
+                            expression={query.jsFn}
                             onChange={onChangeTamarin(this.props, 'tamarinFn')}
                         />
                     </Field>

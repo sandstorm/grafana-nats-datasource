@@ -10,7 +10,7 @@ export interface MyQuery extends DataQuery {
 
     // for REQUEST_REPLY and SUBSCRIBE, gets each individual message and can transform it.
     // for SCRIPT, can take control of any flow.
-    tamarinFn: string;
+    jsFn: string;
 }
 
 export const QueryTypeOptions: SelectableValue<QueryTypes>[] = [

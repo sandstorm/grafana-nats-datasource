@@ -33,7 +33,7 @@ type queryModel struct {
 	NatsSubject    string   `json:"natsSubject"`
 	RequestTimeout Duration `json:"requestTimeout"`
 	RequestData    string   `json:"requestData"`
-	TamarinFn      string   `json:"tamarinFn"`
+	JsFn           string   `json:"jsFn"`
 }
 
 type Duration struct {

@@ -1,7 +1,6 @@
 package plugin
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -11,7 +10,7 @@ import (
 	"github.com/jellydator/ttlcache/v3"
 	"github.com/nats-io/nats.go"
 	"github.com/sandstormmedia/nats/pkg/plugin/framestruct"
-	"github.com/sandstormmedia/nats/pkg/plugin/tamarin"
+	"github.com/sandstormmedia/nats/pkg/plugin/goja"
 	"sync"
 	"time"
 
@@ -217,52 +216,6 @@ func (ds *Datasource) query(ctx context.Context, pCtx backend.PluginContext, que
 	}
 }
 
-func convertJsonBytesToResponse(respData []byte, jqExpression string) (*data.Frame, error) {
-	// Get slice of data with optional leading whitespace removed.
-	// See RFC 7159, Section 2 for the definition of JSON whitespace.
-	x := bytes.TrimLeft(respData, " \t\r\n")
-	isArray := len(x) > 0 && x[0] == '['
-	isObject := len(x) > 0 && x[0] == '{'
-	var frame *data.Frame
-	var err error
-	log.DefaultLogger.Info(fmt.Sprintf("Converting JSON bytes to response. isArray=%v, isObj=%v", isArray, isObject))
-
-	if isArray {
-		if jqExpression == "" {
-			// pass all array values (even single-value ones) through JQ - to simplify code paths.
-			jqExpression = ".[]"
-		}
-		var v []interface{}
-		if err := json.Unmarshal(respData, &v); err != nil {
-			return nil, fmt.Errorf("JSON could not be parsed (1): %w", err)
-		}
-		frame, err = processViaGojq(v, jqExpression)
-		if err != nil {
-			return nil, fmt.Errorf("JQ could not process array: %w", err)
-		}
-	} else if isObject {
-		if jqExpression == "" {
-			// pass all object values through JQ - to simplify code paths.
-			jqExpression = "."
-		}
-		var v interface{}
-		if err := json.Unmarshal(respData, &v); err != nil {
-			return nil, fmt.Errorf("JSON could not be parsed (2): %w", err)
-		}
-		frame, err = processViaGojq(v, jqExpression)
-		if err != nil {
-			log.DefaultLogger.Error(fmt.Sprintf("Error processing object: %s", err))
-			return nil, fmt.Errorf("JQ could not process object: %w", err)
-		}
-	} else {
-		// not an array nor an object. Respond with a single-column "result" string dataframe.
-		frame = data.NewFrame("response")
-		frame.Fields = append(frame.Fields, data.NewField(data.TimeSeriesValueFieldName, nil, []string{string(respData)}))
-	}
-
-	return frame, nil
-}
-
 // CheckHealth handles health checks sent from Grafana to the plugin.
 // The main use case for these health checks is the test button on the
 // datasource configuration page which allows users to verify that
@@ -307,7 +260,7 @@ func (ds *Datasource) requestReply(ctx context.Context, natsConn *nats.Conn, qm 
 		return nil, err
 	}
 
-	return tamarin.ConvertMessage(ctx, resp, qm.TamarinFn)
+	return goja.ConvertMessage(ctx, resp, qm.JsFn)
 }
 
 // subscribe handles a NATS subscription call in streaming fashin.
@@ -344,7 +297,7 @@ func (ds *Datasource) subscribe(_ context.Context, qm queryModel, query backend.
 			// extend TTL everytime we receive a msg.
 			ds.streamResponsesSoFar.Touch(requestUuid)
 			i++
-			convertedMessage, err := tamarin.ConvertStreamingMessage(context.Background(), msg, qm.TamarinFn)
+			convertedMessage, err := goja.ConvertStreamingMessage(context.Background(), msg, qm.JsFn)
 			if err != nil {
 				log.DefaultLogger.Error(fmt.Sprintf("could not convert message %d - error in tamarin script: %s", i, err))
 
