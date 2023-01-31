@@ -12,19 +12,7 @@ import (
 	"reflect"
 )
 
-func ConvertMessage(ctx context.Context, msg *nats.Msg, tamarinFn string) (*data.Frame, error) {
-	if tamarinFn == "" {
-		tamarinFn = `
-			json.unmarshal(msg.Data)
-		`
-		// return {"foo": "bar", x: 42, y: 12}
-		//
-		//
-		// x := json.unmarshal(msg.Data).unwrap()
-		//x["a"] = 42
-		//return x
-
-	}
+func createTamarinScope(msg *nats.Msg) (*scope.Scope, error) {
 	registry, err := object.NewTypeRegistry(object.TypeRegistryOpts{
 		Converters: []object.TypeConverter{
 			bytesConverter{},
@@ -40,6 +28,26 @@ func ConvertMessage(ctx context.Context, msg *nats.Msg, tamarinFn string) (*data
 	}
 	s := scope.New(scope.Opts{})
 	s.Declare("msg", msgProxy, true)
+
+	return s, nil
+}
+func ConvertMessage(ctx context.Context, msg *nats.Msg, tamarinFn string) (*data.Frame, error) {
+	if tamarinFn == "" {
+		tamarinFn = `
+			json.unmarshal(msg.Data)
+		`
+		// return {"foo": "bar", x: 42, y: 12}
+		//
+		//
+		// x := json.unmarshal(msg.Data).unwrap()
+		//x["a"] = 42
+		//return x
+
+	}
+	s, err := createTamarinScope(msg)
+	if err != nil {
+		return nil, err
+	}
 
 	result, err := exec.Execute(ctx, exec.Opts{
 		Input: tamarinFn,
@@ -75,6 +83,43 @@ func ConvertMessage(ctx context.Context, msg *nats.Msg, tamarinFn string) (*data
 	}
 
 	return nil, fmt.Errorf("result of script must be map[string]interface{}, []map[string]interface{}, or data.Frame. Was: %v %s", reflect.TypeOf(result.Interface()), result.Inspect())
+}
+
+func ConvertStreamingMessage(ctx context.Context, msg *nats.Msg, tamarinFn string) (map[string]interface{}, error) {
+	if tamarinFn == "" {
+		tamarinFn = `
+			json.unmarshal(msg.Data)
+		`
+		// return {"foo": "bar", x: 42, y: 12}
+		//
+		//
+		// x := json.unmarshal(msg.Data).unwrap()
+		//x["a"] = 42
+		//return x
+
+	}
+	s, err := createTamarinScope(msg)
+	if err != nil {
+		return nil, err
+	}
+	result, err := exec.Execute(ctx, exec.Opts{
+		Input: tamarinFn,
+		Scope: s,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("execution error: %w", err)
+	}
+
+	fmt.Printf("script result: %s (type %v)\n",
+		result.Inspect(), reflect.TypeOf(result))
+
+	_, isMap := result.Interface().(map[string]interface{})
+
+	if isMap {
+		mapEl := result.Interface().(map[string]interface{})
+		return mapEl, nil
+	}
+	return nil, fmt.Errorf("result of streaming script must be map[string]interface{}. Was: %v %s", reflect.TypeOf(result.Interface()), result.Inspect())
 }
 
 func ensureValue(v reflect.Value) reflect.Value {

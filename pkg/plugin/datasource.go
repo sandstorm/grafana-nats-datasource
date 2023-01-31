@@ -65,9 +65,10 @@ type Datasource struct {
 }
 
 type streamResponse struct {
-	onNewMessages chan bool
-	currentFrame  *data.Frame
-	currentErr    error
+	onNewMessages          chan bool
+	currentFrame           *data.Frame
+	currentErr             error
+	cancelNatsSubscription context.CancelFunc
 }
 
 func (ds *Datasource) SubscribeStream(ctx context.Context, request *backend.SubscribeStreamRequest) (*backend.SubscribeStreamResponse, error) {
@@ -97,7 +98,7 @@ func (ds *Datasource) RunStream(ctx context.Context, request *backend.RunStreamR
 			select {
 			case <-ctx.Done():
 				// we are done.
-				// TODO: close NATS subscription!
+				value.Value().cancelNatsSubscription()
 				return nil
 			case <-value.Value().onNewMessages:
 				// new message
@@ -310,52 +311,88 @@ func (ds *Datasource) requestReply(ctx context.Context, natsConn *nats.Conn, qm 
 // subscribe handles a NATS subscription call in streaming fashin.
 // TODO explain how done
 // inspired by https://github.com/grafana/grafana-iot-twinmaker-app/blob/0947ce1ff0afec8372cae624566726e68687137b/pkg/plugin/datasource.go
-func (ds *Datasource) subscribe(ctx context.Context, qm queryModel, query backend.DataQuery, pCtx backend.PluginContext, natsConn *nats.Conn) backend.DataResponse {
+func (ds *Datasource) subscribe(_ context.Context, qm queryModel, query backend.DataQuery, pCtx backend.PluginContext, natsConn *nats.Conn) backend.DataResponse {
 	requestUuid := uuid.NewString()
 
 	var x map[string]interface{}
 	incrementalDataframe, err := framestruct.ToIncrementalDataFrame("response", x)
 
+	// if the context is cancelled, the NATS subscription should end.
+	ctx, cancel := context.WithCancel(context.Background())
 	sr := &streamResponse{
-		onNewMessages: make(chan bool, 100), // we use a buffered channel here, because we do not want to block at all, if possible.
-		currentFrame:  incrementalDataframe.Frame(),
+		onNewMessages:          make(chan bool, 100), // we use a buffered channel here, because we do not want to block at all, if possible.
+		currentFrame:           incrementalDataframe.Frame(),
+		cancelNatsSubscription: cancel,
 	}
 
 	// TODO: do not hardcode TTL here.
 	ds.streamResponsesSoFar.Set(requestUuid, sr, 5*time.Minute)
 
+	// NOTE: we wait until the 1st
+	wg := sync.WaitGroup{}
+	wg.Add(1)
 	i := 0
 	var subscription *nats.Subscription
 	subscription, err = natsConn.Subscribe(qm.NatsSubject, func(msg *nats.Msg) {
-		// extend TTL everytime we receive a msg.
-		ds.streamResponsesSoFar.Touch(requestUuid)
-		i++
-		convertedMessage, err := tamarin.ConvertMessage(ctx, msg, qm.TamarinFn)
-		if err != nil {
-			sr.currentErr = fmt.Errorf("could not convert message %d - error in tamarin script: %w", i, err)
-			sr.onNewMessages <- true
+		select {
+		case <-ctx.Done():
+			log.DefaultLogger.Debug("Cancelling NATS subscription")
 			subscription.Unsubscribe()
-			return
-		}
-		err = incrementalDataframe.AddRow(convertedMessage)
-		if err != nil {
-			sr.currentErr = fmt.Errorf("could not convert message %d - could not be converted to data frame: %w", i, err)
-			sr.onNewMessages <- true
-			subscription.Unsubscribe()
-			return
-		}
+		default:
+			log.DefaultLogger.Debug("Received NATS Message")
+			// extend TTL everytime we receive a msg.
+			ds.streamResponsesSoFar.Touch(requestUuid)
+			i++
+			convertedMessage, err := tamarin.ConvertStreamingMessage(context.Background(), msg, qm.TamarinFn)
+			if err != nil {
+				log.DefaultLogger.Error(fmt.Sprintf("could not convert message %d - error in tamarin script: %s", i, err))
 
-		// no error :) -> notify sender
-		sr.currentFrame = incrementalDataframe.Frame()
-		sr.onNewMessages <- true
+				sr.currentErr = fmt.Errorf("could not convert message %d - error in tamarin script: %w", i, err)
+				sr.onNewMessages <- true
+				subscription.Unsubscribe()
+				if i == 1 {
+					// for 1st message, answer synchronously
+					wg.Done()
+				}
+				return
+			}
+			log.DefaultLogger.Debug(fmt.Sprintf("ConvMsg %v", convertedMessage))
+			err = incrementalDataframe.AddRow(convertedMessage)
+			if err != nil {
+				log.DefaultLogger.Error(fmt.Sprintf("could not convert message %d - could not be converted to data frame: %s", i, err))
+
+				sr.currentErr = fmt.Errorf("could not convert message %d - could not be converted to data frame: %w", i, err)
+				sr.onNewMessages <- true
+				subscription.Unsubscribe()
+				if i == 1 {
+					// for 1st message, answer synchronously
+					wg.Done()
+				}
+				return
+			}
+
+			// no error :) -> notify sender
+			sr.currentFrame = incrementalDataframe.Frame()
+			sr.onNewMessages <- true
+			if i == 1 {
+				// for 1st message, answer synchronously
+				wg.Done()
+			}
+		}
 	})
 
 	if err != nil {
 		return backend.ErrDataResponse(backend.StatusBadRequest, "could not create subscription: "+err.Error())
 	}
 
-	// create an empty frame with the correct live channel
-	frame := data.NewFrame("response")
+	// wait until the 1st NATS message was received
+	wg.Wait()
+
+	if sr.currentErr != nil {
+		return backend.ErrDataResponse(backend.StatusBadRequest, "error handling 1st message: "+sr.currentErr.Error())
+	}
+
+	frame := sr.currentFrame
 	channel := live.Channel{
 		Scope:     live.ScopeDatasource,
 		Namespace: ds.uid,
