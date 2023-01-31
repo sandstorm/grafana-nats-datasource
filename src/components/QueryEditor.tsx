@@ -1,10 +1,11 @@
 import React, {PureComponent} from 'react';
-import {InlineField, Input, Select, TextArea} from '@grafana/ui';
+import {Field, InlineField, Input, RadioButtonGroup} from '@grafana/ui';
 import {
-    QueryEditorProps, SelectableValue
+    QueryEditorProps
 } from '@grafana/data';
 import {DataSource} from '../datasource';
-import {MyDataSourceOptions, MyQuery, QueryTypeOptions} from '../types';
+import {MyDataSourceOptions, MyQuery, QueryTypeOptions, QueryTypes} from '../types';
+import {TamarinCodeEditorField} from "./TamarinCodeEditorField";
 
 type Props = QueryEditorProps<DataSource, MyQuery, MyDataSourceOptions>;
 
@@ -15,9 +16,18 @@ function onChange(props: Props, fieldName: string) {
     }
 }
 
-function onSelectChange(props: Props, fieldName: string) {
-    return (selected: SelectableValue) => {
-        props.onChange({...props.query, [fieldName]: selected.value});
+function onChangeTamarin(props: Props, fieldName: string) {
+    return (value: string) => {
+        props.onChange({...props.query, [fieldName]: value});
+        props.onRunQuery();
+    }
+}
+
+
+
+function onQueryTypeChange<TVal>(props: Props, fieldName: string) {
+    return (selected: TVal) => {
+        props.onChange({...props.query, [fieldName]: selected});
         props.onRunQuery();
     }
 }
@@ -27,16 +37,14 @@ export class QueryEditor extends PureComponent<Props> {
         const query = this.props.query;
 
         return (
-            <div className="gf-form-group">
-                <div className="gf-form">
-                    <InlineField label="Query Type" tooltip="In which way do we interact with NATS">
-                        <Select
-                            options={QueryTypeOptions}
-                            value={query.queryType}
-                            onChange={onSelectChange(this.props, 'queryType')}
-                        />
-                    </InlineField>
-                </div>
+            <div>
+                <Field label="Query Type" description="How do we interact with the NAtS system">
+                    <RadioButtonGroup<QueryTypes>
+                        options={QueryTypeOptions}
+                        value={query.queryType}
+                        onChange={onQueryTypeChange(this.props, 'queryType')}
+                    />
+                </Field>
                 <div className="gf-form">
                     <InlineField label="NATS Subject" tooltip="the subject to request - f.e. foo.bar.baz">
                         <Input
@@ -56,13 +64,13 @@ export class QueryEditor extends PureComponent<Props> {
                     </InlineField>
                 </div>
                 <div className="gf-form">
-                    <InlineField label="Optional Tamarin Processing Function">
-                        <TextArea
-                            className="width-27"
-                            value={query.tamarinFn}
-                            onChange={onChange(this.props, 'tamarinFn')}
+                    <Field label="Optional Tamarin Processing Function">
+                        <TamarinCodeEditorField
+                            expression={query.tamarinFn}
+                            onChange={onChangeTamarin(this.props, 'tamarinFn')}
+
                         />
-                    </InlineField>
+                    </Field>
                 </div>
             </div>
         );

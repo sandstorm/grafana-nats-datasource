@@ -1,8 +1,9 @@
-import {DataQuery, DataSourceJsonData} from '@grafana/data';
+import {DataQuery, DataSourceJsonData, SelectableValue} from '@grafana/data';
 // These need to be synced with types.go
 
+export type QueryTypes = "REQUEST_REPLY" | "SUBSCRIBE" | "SCRIPT";
 export interface MyQuery extends DataQuery {
-    queryType: "REQUEST_REPLY" | "SUBSCRIBE" | "SCRIPT";
+    queryType: QueryTypes;
     natsSubject: string;
     requestTimeout: string;
     requestData: string;
@@ -12,18 +13,21 @@ export interface MyQuery extends DataQuery {
     tamarinFn: string;
 }
 
-export const QueryTypeOptions = [
+export const QueryTypeOptions: SelectableValue<QueryTypes>[] = [
     {
         label: "Request/Reply",
-        value: "REQUEST_REPLY"
+        value: "REQUEST_REPLY",
+        description: "Send a NATS request and wait for its reply."
     },
     {
         label: "Subscribe",
-        value: "SUBSCRIBE"
+        value: "SUBSCRIBE",
+        description: "Subscribe to a topic (wildcards allowed), and render them in a streaming fashion"
     },
     {
         label: "Free-Form Script (advanced)",
-        value: "SCRIPT"
+        value: "SCRIPT",
+        description: "Orchestrate complex interactions with NATS, like doing requests based on other responses; or reducing multiple responses to a single dataset."
     }
 ];
 
