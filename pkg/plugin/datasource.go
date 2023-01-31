@@ -108,10 +108,12 @@ func (ds *Datasource) RunStream(ctx context.Context, request *backend.RunStreamR
 				}
 
 				// no eror -> send the updated frame to the user.
-				err := sender.SendFrame(value.Value().currentFrame, data.IncludeAll)
-				if err != nil {
-					// TODO: close NATS subscription!
-					return value.Value().currentErr
+				if value.Value().currentFrame != nil {
+					err := sender.SendFrame(value.Value().currentFrame, data.IncludeAll)
+					if err != nil {
+						// TODO: close NATS subscription!
+						return value.Value().currentErr
+					}
 				}
 			}
 		}
@@ -314,14 +316,11 @@ func (ds *Datasource) requestReply(ctx context.Context, natsConn *nats.Conn, qm 
 func (ds *Datasource) subscribe(_ context.Context, qm queryModel, query backend.DataQuery, pCtx backend.PluginContext, natsConn *nats.Conn) backend.DataResponse {
 	requestUuid := uuid.NewString()
 
-	var x map[string]interface{}
-	incrementalDataframe, err := framestruct.ToIncrementalDataFrame("response", x)
-
 	// if the context is cancelled, the NATS subscription should end.
 	ctx, cancel := context.WithCancel(context.Background())
 	sr := &streamResponse{
 		onNewMessages:          make(chan bool, 100), // we use a buffered channel here, because we do not want to block at all, if possible.
-		currentFrame:           incrementalDataframe.Frame(),
+		currentFrame:           nil,
 		cancelNatsSubscription: cancel,
 	}
 
@@ -333,6 +332,8 @@ func (ds *Datasource) subscribe(_ context.Context, qm queryModel, query backend.
 	wg.Add(1)
 	i := 0
 	var subscription *nats.Subscription
+	var err error
+	var firstFrame *data.Frame
 	subscription, err = natsConn.Subscribe(qm.NatsSubject, func(msg *nats.Msg) {
 		select {
 		case <-ctx.Done():
@@ -357,7 +358,8 @@ func (ds *Datasource) subscribe(_ context.Context, qm queryModel, query backend.
 				return
 			}
 			log.DefaultLogger.Debug(fmt.Sprintf("ConvMsg %v", convertedMessage))
-			err = incrementalDataframe.AddRow(convertedMessage)
+			frame, err := framestruct.ToDataFrame("request", convertedMessage)
+			// err = incrementalDataframe.AddRow(convertedMessage)
 			if err != nil {
 				log.DefaultLogger.Error(fmt.Sprintf("could not convert message %d - could not be converted to data frame: %s", i, err))
 
@@ -372,11 +374,13 @@ func (ds *Datasource) subscribe(_ context.Context, qm queryModel, query backend.
 			}
 
 			// no error :) -> notify sender
-			sr.currentFrame = incrementalDataframe.Frame()
-			sr.onNewMessages <- true
 			if i == 1 {
 				// for 1st message, answer synchronously
+				firstFrame = frame
 				wg.Done()
+			} else {
+				sr.currentFrame = frame
+				sr.onNewMessages <- true
 			}
 		}
 	})
@@ -392,16 +396,15 @@ func (ds *Datasource) subscribe(_ context.Context, qm queryModel, query backend.
 		return backend.ErrDataResponse(backend.StatusBadRequest, "error handling 1st message: "+sr.currentErr.Error())
 	}
 
-	frame := sr.currentFrame
 	channel := live.Channel{
 		Scope:     live.ScopeDatasource,
 		Namespace: ds.uid,
 		Path:      requestUuid, // because request UUID is random, we cannot snoop on other people's values (security). and we have one subscription per user (which is what we want in our case)
 	}
-	frame.SetMeta(&data.FrameMeta{Channel: channel.String()})
+	firstFrame.SetMeta(&data.FrameMeta{Channel: channel.String()})
 	return backend.DataResponse{
 		Frames: data.Frames{
-			frame,
+			firstFrame,
 		},
 		Status: backend.StatusOK,
 	}

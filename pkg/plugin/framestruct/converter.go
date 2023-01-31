@@ -38,56 +38,6 @@ func ToDataFrame(name string, toConvert interface{}, opts ...FramestructOption) 
 	return cr.toDataframe(name, toConvert)
 }
 
-type IncrementalDataFrame struct {
-	converter *converter
-	name      string
-}
-
-func (idf *IncrementalDataFrame) Frame() *data.Frame {
-	return idf.converter.createFrame(idf.name)
-}
-
-func (idf *IncrementalDataFrame) AddRow(toConvert interface{}) error {
-	c := idf.converter
-	v := c.ensureValue(reflect.ValueOf(toConvert))
-	if !supportedToplevelType(v) {
-		return errors.New("unsupported type: can only convert structs, slices, and maps")
-	}
-	c.maxLen++
-
-	if err := c.handleValue(v, "", ""); err != nil {
-		return nil
-	}
-	return nil
-}
-
-// ToIncrementalDataFrame flattens an arbitrary struct or slice of structs into a *data.Frame
-func ToIncrementalDataFrame(name string, toConvert interface{}, opts ...FramestructOption) (*IncrementalDataFrame, error) {
-	cr := &converter{
-		fields:     make(map[string]*data.Field),
-		tags:       make([]string, 3),
-		converters: make(map[string]FieldConverter),
-	}
-
-	for _, o := range opts {
-		o(cr)
-	}
-
-	v := cr.ensureValue(reflect.ValueOf(toConvert))
-	if !supportedToplevelType(v) {
-		return nil, errors.New("unsupported type: can only convert structs, slices, and maps")
-	}
-
-	if err := cr.handleValue(v, "", ""); err != nil {
-		return nil, err
-	}
-
-	return &IncrementalDataFrame{
-		converter: cr,
-		name:      name,
-	}, nil
-}
-
 // ToDataFrames is a convenience wrapper around ToDataFrame. It will wrap the
 // converted DataFrame in a data.Frames. Additionally, if the passed type
 // satisfies the data.Framer interface, the function will delegate to that
