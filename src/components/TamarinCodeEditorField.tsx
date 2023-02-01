@@ -4,15 +4,23 @@ import React, {useCallback, useRef} from 'react';
 import {CodeEditor, Monaco} from '@grafana/ui';
 // inspired by https://github.com/grafana/grafana/blob/78184f37c444bd8c36437498bde365a6a81bb71d/public/app/plugins/datasource/cloudwatch/components/MathExpressionQueryField.tsx
 
-//import language from '../language/metric-math/definition';
-import {conf, language} from "./language/tamarinLang";
-
 
 export interface Props {
     onChange: (query: string) => void;
     expression: string;
     //datasource: CloudWatchDatasource;
 }
+
+
+// extra libraries
+const libSource = `
+declare class Facts {
+    /**
+     * Returns the next fact
+     */
+    static next():string
+`;
+const libUri = 'ts:filename/facts.d.ts';
 
 
 /*const TRIGGER_SUGGEST = {
@@ -72,20 +80,28 @@ export function TamarinCodeEditorField({expression: expression, onChange}: React
                     },
                 }}
 
-                language={language.id}
+                language="javascript"
                 value={expression}
                 onBlur={(value) => {
                     if (value !== expression) {
                         onChange(value);
                     }
                 }}
-
                 onBeforeEditorMount={(monaco: Monaco) => {
-                    monaco.languages.register({id: language.id});
-                    monaco.languages.setMonarchTokensProvider(language.id, language);
-                    monaco.languages.setLanguageConfiguration(language.id, conf);
-                    //monaco.languages.registerCompletionItemProvider(language.id, completionItemProvider.getCompletionProvider(monaco, language));
+                    monaco.languages.typescript.javascriptDefaults.addExtraLib(libSource, libUri);
+                    // When resolving definitions and references, the editor will try to use created models.
+                    // Creating a model for the library allows "peek definition/references" commands to work with the library.
+                    monaco.editor.createModel(libSource, 'typescript', monaco.Uri.parse(libUri));
+
+                    // see https://github.com/microsoft/monaco-editor/issues/1661#issuecomment-777289233
+                    monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
+                        noSemanticValidation: false,
+                        noSyntaxValidation: false,
+                        diagnosticCodesToIgnore: [/* top-level return */ 1108]
+                    });
+
                 }}
+
                 onEditorDidMount={onEditorMount}
             />
         </div>

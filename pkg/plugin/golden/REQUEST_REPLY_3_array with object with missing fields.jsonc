@@ -1,17 +1,17 @@
 //  🌟 This was machine generated.  Do not edit. 🌟
 //  
 //  Frame[0] 
-//  Name: response
+//  Name: result
 //  Dimensions: 6 Fields by 3 Rows
-//  +---------------+---------------+------------------+------------------+-----------------+-----------------+
-//  | Name: b1      | Name: b2      | Name: f1         | Name: i1         | Name: s1        | Name: s2        |
-//  | Labels:       | Labels:       | Labels:          | Labels:          | Labels:         | Labels:         |
-//  | Type: []*bool | Type: []*bool | Type: []*float64 | Type: []*float64 | Type: []*string | Type: []*string |
-//  +---------------+---------------+------------------+------------------+-----------------+-----------------+
-//  | true          | null          | 42               | 42               | my string       | null            |
-//  | null          | false         | 12               | 21               | null            | my string other |
-//  | false         | null          | 12               | 21               | my string other | null            |
-//  +---------------+---------------+------------------+------------------+-----------------+-----------------+
+//  +---------------+---------------+----------------+----------------+-----------------+-----------------+
+//  | Name: b1      | Name: b2      | Name: f1       | Name: i1       | Name: s1        | Name: s2        |
+//  | Labels:       | Labels:       | Labels:        | Labels:        | Labels:         | Labels:         |
+//  | Type: []*bool | Type: []*bool | Type: []*int64 | Type: []*int64 | Type: []*string | Type: []*string |
+//  +---------------+---------------+----------------+----------------+-----------------+-----------------+
+//  | true          | null          | 42             | 42             | my string       | null            |
+//  | null          | false         | 12             | 21             | null            | my string other |
+//  | false         | null          | 12             | 21             | my string other | null            |
+//  +---------------+---------------+----------------+----------------+-----------------+-----------------+
 //  
 //  
 //  🌟 This was machine generated.  Do not edit. 🌟
@@ -20,7 +20,7 @@
   "frames": [
     {
       "schema": {
-        "name": "response",
+        "name": "result",
         "fields": [
           {
             "name": "b1",
@@ -42,7 +42,7 @@
             "name": "f1",
             "type": "number",
             "typeInfo": {
-              "frame": "float64",
+              "frame": "int64",
               "nullable": true
             }
           },
@@ -50,7 +50,7 @@
             "name": "i1",
             "type": "number",
             "typeInfo": {
-              "frame": "float64",
+              "frame": "int64",
               "nullable": true
             }
           },

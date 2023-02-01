@@ -37,7 +37,7 @@ var (
 func NewDatasource(config backend.DataSourceInstanceSettings) (instancemgmt.Instance, error) {
 	return &Datasource{
 		uid:                  config.UID,
-		natsConnOnce:         new(sync.Once),
+		natsConnOnce:         &sync.Once{},
 		streamResponsesSoFar: ttlcache.New[string, *streamResponse](),
 	}, nil
 }

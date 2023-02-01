@@ -1,16 +1,16 @@
 //  🌟 This was machine generated.  Do not edit. 🌟
 //  
 //  Frame[0] 
-//  Name: response
+//  Name: result
 //  Dimensions: 2 Fields by 2 Rows
-//  +-----------------+------------------+
-//  | Name: id        | Name: k          |
-//  | Labels:         | Labels:          |
-//  | Type: []*string | Type: []*float64 |
-//  +-----------------+------------------+
-//  | null            | 42               |
-//  | my string other | 21               |
-//  +-----------------+------------------+
+//  +-----------------+----------------+
+//  | Name: id        | Name: k        |
+//  | Labels:         | Labels:        |
+//  | Type: []*string | Type: []*int64 |
+//  +-----------------+----------------+
+//  | null            | 42             |
+//  | my string other | 21             |
+//  +-----------------+----------------+
 //  
 //  
 //  🌟 This was machine generated.  Do not edit. 🌟
@@ -19,7 +19,7 @@
   "frames": [
     {
       "schema": {
-        "name": "response",
+        "name": "result",
         "fields": [
           {
             "name": "id",
@@ -33,7 +33,7 @@
             "name": "k",
             "type": "number",
             "typeInfo": {
-              "frame": "float64",
+              "frame": "int64",
               "nullable": true
             }
           }

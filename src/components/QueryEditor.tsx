@@ -16,7 +16,7 @@ function onChange(props: Props, fieldName: string) {
     }
 }
 
-function onChangeTamarin(props: Props, fieldName: string) {
+function onChangeJs(props: Props, fieldName: string) {
     return (value: string) => {
         props.onChange({...props.query, [fieldName]: value});
         props.onRunQuery();
@@ -38,15 +38,14 @@ const scripts: {  [prop in SCRIPT_IDS]: string} = {
         // This script is by default used in the backend if no script is given.
     
         // msg.Data contains the received NATS message as string.
-        // json.unmarshal converts the message to a Map.
         // by default, the last line of a script is returned automatically.
-        json.unmarshal(msg.Data)
+        JSON.parse(msg.Data)
     `,
     headers: `
         // You can covert NATS message headers to columns (and in the same way, do any kind of calculation
 
         // Workaround: unwrap() is needed to convert the Result object to a plain map.
-        row := json.unmarshal(msg.Data).unwrap()
+        row = JSON.parse(msg.Data)
         row["otherHeader"] = msg.Header.Get("My-Header")    
         
         return row
@@ -54,12 +53,12 @@ const scripts: {  [prop in SCRIPT_IDS]: string} = {
 };
 
 
-function explanationForQueryType(queryType: QueryTypes): { title: string, content: React.ReactNode, tamarinLabel: string, tamarinDescription: React.ReactNode, tamarinExamples?: CascaderOption[] } {
-    if (queryType == "REQUEST_REPLY") {
+function explanationForQueryType(queryType: QueryTypes): { title: string, content: React.ReactNode, mapFnLabel: string, mapFnDescription: React.ReactNode, mapFnExamples?: CascaderOption[] } {
+    if (queryType === "REQUEST_REPLY") {
         return {
             title: 'Request/Reply mode explained',
             content: <>
-                <p><a href="https://docs.nats.io/nats-concepts/core-nats/reqreply" target="_blank">NATS
+                <p><a href="https://docs.nats.io/nats-concepts/core-nats/reqreply" target="_blank" rel="noreferrer">NATS
                     Request/Reply</a>:
                     Sends a request on the given subject with an empty payload, and <em>renders the single
                         response</em> (delivered to the _INBOX).</p>
@@ -70,17 +69,15 @@ function explanationForQueryType(queryType: QueryTypes): { title: string, conten
 
                 <p>You can post-process each message via the Tamarin script language.</p>
             </>,
-            tamarinLabel: 'Response Mapping Script',
-            tamarinDescription: <>
+            mapFnLabel: 'Response Mapping JavaScript',
+            mapFnDescription: <>
                 Input: <code>msg</code> contains the received message as a <a
-                href="https://pkg.go.dev/github.com/nats-io/nats.go#Msg" target="_blank">nats.Msg</a>.<br/>
+                href="https://pkg.go.dev/github.com/nats-io/nats.go#Msg" target="_blank" rel="noreferrer">nats.Msg</a>.<br/>
                 Supported Return values: A map <code>{'{k: "v"}'}</code>, a list of maps <code>{'[{k: "v"}]'}</code>,
                 a <a href="https://pkg.go.dev/github.com/grafana/grafana-plugin-sdk-go@v0.147.0/data#Frame"
-                     target="_blank">data.Frame</a>.<br/>
-                <a href="https://cloudcmds.github.io/tamarin/" target="_blank">Guide to Tamarin:</a> Tamarin is a
-                scripting language, a hybrid between Golang and JS.
+                     target="_blank" rel="noreferrer">data.Frame</a>.
             </>,
-            tamarinExamples: [
+            mapFnExamples: [
                 {
                     label: 'Default script',
                     title: 'The most simple script which is used by default on the backend.',
@@ -94,15 +91,15 @@ function explanationForQueryType(queryType: QueryTypes): { title: string, conten
             ]
         };
     }
-    if (queryType == "SUBSCRIBE") {
+    if (queryType === "SUBSCRIBE") {
         return {
             title: 'Subscribe mode explained',
             content: <>
-                <p><a href="https://docs.nats.io/nats-concepts/core-nats/pubsub" target="_blank">NATS
+                <p><a href="https://docs.nats.io/nats-concepts/core-nats/pubsub" target="_blank" rel="noreferrer">NATS
                     Publish/Subscribe</a>:
                     Listen to messages on the given subject pattern, and sends them via
                     <a href="https://grafana.com/docs/grafana/latest/setup-grafana/set-up-grafana-live/"
-                       target="_blank">Grafana Live</a>
+                       target="_blank" rel="noreferrer">Grafana Live</a>
                     to the frontend.</p>
 
                 <p>JSON messages can be rendered directly - nested JSON is flattened. Example messages: <br/>
@@ -110,15 +107,13 @@ function explanationForQueryType(queryType: QueryTypes): { title: string, conten
 
                 <p>You can post-process each message via the Tamarin script language.</p>
             </>,
-            tamarinLabel: 'Message Mapping Script',
-            tamarinDescription: <>
+            mapFnLabel: 'Message Mapping JavaScript',
+            mapFnDescription: <>
                 Input: <code>msg</code> contains the received message as a <a
-                href="https://pkg.go.dev/github.com/nats-io/nats.go#Msg" target="_blank">nats.Msg</a>.<br/>
-                Supported Return values: A map <code>{'{k: "v"}'}</code>.<br/>
-                <a href="https://cloudcmds.github.io/tamarin/" target="_blank">Guide to Tamarin:</a> Tamarin is a
-                scripting language, a hybrid between Golang and JS.
+                href="https://pkg.go.dev/github.com/nats-io/nats.go#Msg" target="_blank" rel="noreferrer">nats.Msg</a>.<br/>
+                Supported Return values: A map <code>{'{k: "v"}'}</code>.
             </>,
-            tamarinExamples: [
+            mapFnExamples: [
                 {
                     label: 'Default script',
                     title: 'The most simple script which is used by default on the backend.',
@@ -133,7 +128,7 @@ function explanationForQueryType(queryType: QueryTypes): { title: string, conten
 
         };
     }
-    if (queryType == "SCRIPT") {
+    if (queryType === "SCRIPT") {
         return {
             title: 'Script mode explained',
             content: <>
@@ -148,21 +143,19 @@ function explanationForQueryType(queryType: QueryTypes): { title: string, conten
                 <p>The free-form script can return results directly or <em>stream them</em> to the UI. See the inline
                     script examples, they are heavily commented.</p>
             </>,
-            tamarinLabel: 'Response Mapping Script',
-            tamarinDescription:
+            mapFnLabel: 'Response Mapping JavaScript',
+            mapFnDescription:
                 <>
                     Input: <code>nc</code> the <a
-                    href="https://pkg.go.dev/github.com/nats-io/nats.go#Conn" target="_blank">nats.Conn</a> you can use
+                    href="https://pkg.go.dev/github.com/nats-io/nats.go#Conn" target="_blank" rel="noreferrer">nats.Conn</a> you can use
                     to
                     <a href="https://pkg.go.dev/github.com/nats-io/nats.go#Conn.Subscribe">nc.Subscribe()</a>,
                     <a href="https://pkg.go.dev/github.com/nats-io/nats.go#Conn.Request">nc.Request()</a><br/> (or any
                     other interaction).<br/>
                     Supported Return values: <a href="https://pkg.go.dev/github.com/grafana/grafana-plugin-sdk-go@v0.147.0/data#Frame"
-                    target="_blank">data.Frame</a> or an error.<br/>
-                    <a href="https://cloudcmds.github.io/tamarin/" target="_blank">Guide to Tamarin:</a> Tamarin is
-                    a scripting language, a hybrid between Golang and JS.
+                    target="_blank" rel="noreferrer">data.Frame</a> or an error.
                 </>,
-            tamarinExamples: [
+            mapFnExamples: [
 
             ]
 
@@ -215,15 +208,15 @@ export class QueryEditor extends PureComponent<Props> {
                     </Field>
                 </div>
                 <div className="gf-form">
-                    <Field label={explanation.tamarinLabel} style={{width: '100%'}}
-                           description={explanation.tamarinDescription}>
+                    <Field label={explanation.mapFnLabel} style={{width: '100%'}}
+                           description={explanation.mapFnDescription}>
                         <TamarinCodeEditorField
                             expression={query.jsFn}
-                            onChange={onChangeTamarin(this.props, 'tamarinFn')}
+                            onChange={onChangeJs(this.props, 'jsFn')}
                         />
                     </Field>
-                    {explanation.tamarinExamples ?
-                        <ButtonCascader options={explanation.tamarinExamples} onChange={(value) => onChangeTamarin(this.props, 'tamarinFn')(scripts[value[0] as SCRIPT_IDS])}>
+                    {explanation.mapFnExamples ?
+                        <ButtonCascader options={explanation.mapFnExamples} onChange={(value) => onChangeJs(this.props, 'jsFn')(scripts[value[0] as SCRIPT_IDS])}>
                             Example Code
                         </ButtonCascader> : null}
                 </div>
