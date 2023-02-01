@@ -14,26 +14,27 @@ import (
 
 var gojaPool = sync.Pool{
 	New: func() any {
-		goja := goja.New()
-		return goja
+		vm := goja.New()
+		vm.Set("log", func(msg string) {
+			log.DefaultLogger.Info(msg)
+		})
+		vm.Set("__bytesToStr", func(bytes []byte) string {
+			return string(bytes)
+		})
+		return vm
 	},
 }
 
 func wrapJs(in string) string {
 	return fmt.Sprintf(`
 "use strict";
-
-const msg = Object.create(__rawMsg);
-Object.defineProperty(msg, "Data", {
-	get() {
-		return __bytesToStr(__rawMsg.Data);
-	},
-});
-
-
-
-
 (function() {
+	const msg = Object.create(__rawMsg);
+	Object.defineProperty(msg, "Data", {
+		get() {
+			return __bytesToStr(__rawMsg.Data);
+		},
+	});
 	%s;
 })()
 `, in)
@@ -52,15 +53,9 @@ func ConvertMessage(ctx context.Context, msg *nats.Msg, jsFn string) (*data.Fram
 		//x["a"] = 42
 		//return x
 	}
-
-	vm := goja.New()
-	vm.Set("log", func(msg string) {
-		log.DefaultLogger.Info(msg)
-	})
+	vm := gojaPool.Get().(*goja.Runtime)
+	defer gojaPool.Put(vm)
 	vm.Set("__rawMsg", msg)
-	vm.Set("__bytesToStr", func(bytes []byte) string {
-		return string(bytes)
-	})
 
 	resultWrapper, err := vm.RunString(wrapJs(jsFn))
 	if err != nil {
