@@ -29,11 +29,12 @@ const QueryTypeSubscribe = "SUBSCRIBE"
 const QueryTypeScript = "SCRIPT"
 
 type queryModel struct {
-	QueryType      string   `json:"queryType"`
-	NatsSubject    string   `json:"natsSubject"`
-	RequestTimeout Duration `json:"requestTimeout"`
-	RequestData    string   `json:"requestData"`
-	JsFn           string   `json:"jsFn"`
+	QueryType                   string   `json:"queryType"`
+	NatsSubject                 string   `json:"natsSubject"`
+	RequestTimeout              Duration `json:"requestTimeout"`
+	RequestData                 string   `json:"requestData"`
+	JsFn                        string   `json:"jsFn"`
+	StreamRequestUuidForTesting string   `json:"testing_streamRequestUuid"` // for deterministic tests only
 }
 
 type Duration struct {

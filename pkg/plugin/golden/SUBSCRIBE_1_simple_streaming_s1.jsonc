@@ -1,0 +1,75 @@
+//  🌟 This was machine generated.  Do not edit. 🌟
+//  
+//  Frame[0] 
+//  Name: result
+//  Dimensions: 4 Fields by 1 Rows
+//  +---------------+----------------+----------------+-----------------+
+//  | Name: b1      | Name: f1       | Name: i1       | Name: s1        |
+//  | Labels:       | Labels:        | Labels:        | Labels:         |
+//  | Type: []*bool | Type: []*int64 | Type: []*int64 | Type: []*string |
+//  +---------------+----------------+----------------+-----------------+
+//  | false         | 21             | 21             | my string2      |
+//  +---------------+----------------+----------------+-----------------+
+//  
+//  
+//  🌟 This was machine generated.  Do not edit. 🌟
+{
+  "status": 200,
+  "frames": [
+    {
+      "schema": {
+        "name": "result",
+        "fields": [
+          {
+            "name": "b1",
+            "type": "boolean",
+            "typeInfo": {
+              "frame": "bool",
+              "nullable": true
+            }
+          },
+          {
+            "name": "f1",
+            "type": "number",
+            "typeInfo": {
+              "frame": "int64",
+              "nullable": true
+            }
+          },
+          {
+            "name": "i1",
+            "type": "number",
+            "typeInfo": {
+              "frame": "int64",
+              "nullable": true
+            }
+          },
+          {
+            "name": "s1",
+            "type": "string",
+            "typeInfo": {
+              "frame": "string",
+              "nullable": true
+            }
+          }
+        ]
+      },
+      "data": {
+        "values": [
+          [
+            false
+          ],
+          [
+            21
+          ],
+          [
+            21
+          ],
+          [
+            "my string2"
+          ]
+        ]
+      }
+    }
+  ]
+}

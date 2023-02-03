@@ -9,7 +9,6 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/live"
 	"github.com/jellydator/ttlcache/v3"
 	"github.com/nats-io/nats.go"
-	"github.com/sandstormmedia/nats/pkg/plugin/framestruct"
 	"github.com/sandstormmedia/nats/pkg/plugin/goja"
 	"sync"
 	"time"
@@ -68,6 +67,8 @@ type streamResponse struct {
 	currentFrame           *data.Frame
 	currentErr             error
 	cancelNatsSubscription context.CancelFunc
+	// set to true once the NATS subscription is set up. Required for deterministic tests.
+	subscribed bool
 }
 
 func (ds *Datasource) SubscribeStream(ctx context.Context, request *backend.SubscribeStreamRequest) (*backend.SubscribeStreamResponse, error) {
@@ -268,6 +269,9 @@ func (ds *Datasource) requestReply(ctx context.Context, natsConn *nats.Conn, qm 
 // inspired by https://github.com/grafana/grafana-iot-twinmaker-app/blob/0947ce1ff0afec8372cae624566726e68687137b/pkg/plugin/datasource.go
 func (ds *Datasource) subscribe(_ context.Context, qm queryModel, query backend.DataQuery, pCtx backend.PluginContext, natsConn *nats.Conn) backend.DataResponse {
 	requestUuid := uuid.NewString()
+	if len(qm.StreamRequestUuidForTesting) > 0 {
+		requestUuid = qm.StreamRequestUuidForTesting
+	}
 
 	// if the context is cancelled, the NATS subscription should end.
 	ctx, cancel := context.WithCancel(context.Background())
@@ -280,7 +284,7 @@ func (ds *Datasource) subscribe(_ context.Context, qm queryModel, query backend.
 	// TODO: do not hardcode TTL here.
 	ds.streamResponsesSoFar.Set(requestUuid, sr, 5*time.Minute)
 
-	// NOTE: we wait until the 1st
+	// NOTE: we wait until the 1st message is received
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	i := 0
@@ -297,7 +301,7 @@ func (ds *Datasource) subscribe(_ context.Context, qm queryModel, query backend.
 			// extend TTL everytime we receive a msg.
 			ds.streamResponsesSoFar.Touch(requestUuid)
 			i++
-			convertedMessage, err := goja.ConvertStreamingMessage(context.Background(), msg, qm.JsFn)
+			frame, err := goja.ConvertMessage(context.Background(), msg, qm.JsFn)
 			if err != nil {
 				log.DefaultLogger.Error(fmt.Sprintf("could not convert message %d - error in tamarin script: %s", i, err))
 
@@ -310,9 +314,6 @@ func (ds *Datasource) subscribe(_ context.Context, qm queryModel, query backend.
 				}
 				return
 			}
-			log.DefaultLogger.Debug(fmt.Sprintf("ConvMsg %v", convertedMessage))
-			frame, err := framestruct.ToDataFrame("request", convertedMessage)
-			// err = incrementalDataframe.AddRow(convertedMessage)
 			if err != nil {
 				log.DefaultLogger.Error(fmt.Sprintf("could not convert message %d - could not be converted to data frame: %s", i, err))
 
@@ -341,10 +342,13 @@ func (ds *Datasource) subscribe(_ context.Context, qm queryModel, query backend.
 	if err != nil {
 		return backend.ErrDataResponse(backend.StatusBadRequest, "could not create subscription: "+err.Error())
 	}
+	log.DefaultLogger.Debug(fmt.Sprintf("%s: Subscription set up for %s", requestUuid, qm.NatsSubject))
+	sr.subscribed = true
 
 	// wait until the 1st NATS message was received
 	wg.Wait()
 
+	log.DefaultLogger.Debug(fmt.Sprintf("Finished waiting"))
 	if sr.currentErr != nil {
 		return backend.ErrDataResponse(backend.StatusBadRequest, "error handling 1st message: "+sr.currentErr.Error())
 	}

@@ -95,32 +95,3 @@ func ConvertMessage(ctx context.Context, msg *nats.Msg, jsFn string) (*data.Fram
 
 	return nil, fmt.Errorf("result of script must be map[string]interface{}, []map[string]interface{}, or data.Frame. Was: %v", reflect.TypeOf(result))
 }
-
-func ConvertStreamingMessage(ctx context.Context, msg *nats.Msg, jsFn string) (map[string]interface{}, error) {
-	if jsFn == "" {
-		jsFn = `
-			return JSON.parse(msg.Data)
-		`
-		// return {"foo": "bar", x: 42, y: 12}
-		//
-		//
-		// x := json.unmarshal(msg.Data).unwrap()
-		//x["a"] = 42
-		//return x
-
-	}
-	vm := goja.New()
-	vm.Set("msg", msg)
-	resultWrapper, err := vm.RunString(wrapJs(jsFn))
-	if err != nil {
-		return nil, err
-	}
-
-	result := resultWrapper.Export()
-	mapEl, isMap := result.(map[string]interface{})
-
-	if isMap {
-		return mapEl, nil
-	}
-	return nil, fmt.Errorf("result of streaming script must be map[string]interface{}. Was: %v", reflect.TypeOf(result))
-}
