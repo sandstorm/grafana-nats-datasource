@@ -142,6 +142,8 @@ function explanationForQueryType(queryType: QueryTypes): { title: string, conten
 
                 <p>The free-form script can return results directly or <em>stream them</em> to the UI. See the inline
                     script examples, they are heavily commented.</p>
+
+                <p>The API is basically like the </p>
             </>,
             mapFnLabel: 'Response Mapping JavaScript',
             mapFnDescription:
@@ -152,6 +154,7 @@ function explanationForQueryType(queryType: QueryTypes): { title: string, conten
                     <a href="https://pkg.go.dev/github.com/nats-io/nats.go#Conn.Subscribe">nc.Subscribe()</a>,
                     <a href="https://pkg.go.dev/github.com/nats-io/nats.go#Conn.Request">nc.Request()</a><br/> (or any
                     other interaction).<br/>
+                    API: <code>d("1s")</code>create a time.Duration<br/>
                     Supported Return values: <a href="https://pkg.go.dev/github.com/grafana/grafana-plugin-sdk-go@v0.147.0/data#Frame"
                     target="_blank" rel="noreferrer">data.Frame</a> or an error.
                 </>,

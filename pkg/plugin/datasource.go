@@ -20,9 +20,7 @@ import (
 
 // Make sure Datasource implements required interfaces. This is important to do
 // since otherwise we will only get a not implemented error response from plugin in
-// runtime. In this example datasource instance implements backend.QueryDataHandler,
-// backend.CheckHealthHandler interfaces. Plugin should not implement all these
-// interfaces- only those which are required for a particular task.
+// runtime.
 var (
 	_ backend.QueryDataHandler   = (*Datasource)(nil)
 	_ backend.CheckHealthHandler = (*Datasource)(nil)
@@ -71,7 +69,7 @@ type streamResponse struct {
 	subscribed bool
 }
 
-func (ds *Datasource) SubscribeStream(ctx context.Context, request *backend.SubscribeStreamRequest) (*backend.SubscribeStreamResponse, error) {
+func (ds *Datasource) SubscribeStream(_ context.Context, request *backend.SubscribeStreamRequest) (*backend.SubscribeStreamResponse, error) {
 	status := backend.SubscribeStreamStatusNotFound
 
 	value := ds.streamResponsesSoFar.Get(request.Path)
@@ -84,7 +82,7 @@ func (ds *Datasource) SubscribeStream(ctx context.Context, request *backend.Subs
 	}, nil
 }
 
-func (ds *Datasource) PublishStream(ctx context.Context, request *backend.PublishStreamRequest) (*backend.PublishStreamResponse, error) {
+func (ds *Datasource) PublishStream(_ context.Context, _ *backend.PublishStreamRequest) (*backend.PublishStreamResponse, error) {
 	// we do not allow any write operation from the frontend (so far)
 	return &backend.PublishStreamResponse{
 		Status: backend.PublishStreamStatusPermissionDenied,
@@ -107,7 +105,7 @@ func (ds *Datasource) RunStream(ctx context.Context, request *backend.RunStreamR
 					return value.Value().currentErr
 				}
 
-				// no eror -> send the updated frame to the user.
+				// no error -> send the updated frame to the user.
 				if value.Value().currentFrame != nil {
 					err := sender.SendFrame(value.Value().currentFrame, data.IncludeAll)
 					if err != nil {
@@ -117,7 +115,6 @@ func (ds *Datasource) RunStream(ctx context.Context, request *backend.RunStreamR
 				}
 			}
 		}
-		return nil
 	}
 	return fmt.Errorf("no data found for stream %s", request.Path)
 }
@@ -177,12 +174,12 @@ func (ds *Datasource) query(ctx context.Context, pCtx backend.PluginContext, que
 	//////////////
 	// 2) Connect
 	//////////////
-	natsConn, err := ds.connectNats(dataSourceOptions, dataSourceSecureOptions)
+	nc, err := ds.connectNats(dataSourceOptions, dataSourceSecureOptions)
 	if err != nil {
 		return backend.ErrDataResponse(backend.StatusBadRequest, "NATS connection error:  "+err.Error())
 	}
-	// TODO: lateron, keep the nats connection open for some minutes instead of tearing it down for every req.
-	//defer natsConn.Close()
+	// TODO: later, keep the nats connection open for some minutes instead of tearing it down for every req.
+	//defer nc.Close()
 
 	//////////////
 	// 3) do request
@@ -199,7 +196,7 @@ func (ds *Datasource) query(ctx context.Context, pCtx backend.PluginContext, que
 		qm.RequestTimeout.Duration = 5 * time.Second
 	}
 	if qm.QueryType == QueryTypeRequestReply {
-		frame, err := ds.requestReply(ctx, natsConn, qm)
+		frame, err := ds.requestReply(nc, qm)
 		if err != nil {
 			return backend.ErrDataResponse(backend.StatusBadRequest, "Response conversion error: "+err.Error())
 		}
@@ -211,7 +208,9 @@ func (ds *Datasource) query(ctx context.Context, pCtx backend.PluginContext, que
 			Status: backend.StatusOK,
 		}
 	} else if qm.QueryType == QueryTypeSubscribe {
-		return ds.subscribe(ctx, qm, query, pCtx, natsConn)
+		return ds.subscribe(ctx, qm, nc)
+	} else if qm.QueryType == QueryTypeScript {
+		return ds.script(ctx, qm, nc)
 	} else {
 		return backend.ErrDataResponse(backend.StatusBadRequest, "Invalid Query Type: "+qm.QueryType)
 	}
@@ -255,19 +254,19 @@ func (ds *Datasource) CheckHealth(_ context.Context, req *backend.CheckHealthReq
 	}, nil
 }
 
-func (ds *Datasource) requestReply(ctx context.Context, natsConn *nats.Conn, qm queryModel) (*data.Frame, error) {
-	resp, err := natsConn.Request(qm.NatsSubject, []byte(qm.RequestData), qm.RequestTimeout.Duration)
+func (ds *Datasource) requestReply(nc *nats.Conn, qm queryModel) (*data.Frame, error) {
+	resp, err := nc.Request(qm.NatsSubject, []byte(qm.RequestData), qm.RequestTimeout.Duration)
 	if err != nil {
 		return nil, err
 	}
 
-	return goja.ConvertMessage(ctx, resp, qm.JsFn)
+	return goja.ConvertMessage(nc, resp, qm.JsFn)
 }
 
-// subscribe handles a NATS subscription call in streaming fashin.
+// subscribe handles a NATS subscription call in streaming fashion.
 // TODO explain how done
 // inspired by https://github.com/grafana/grafana-iot-twinmaker-app/blob/0947ce1ff0afec8372cae624566726e68687137b/pkg/plugin/datasource.go
-func (ds *Datasource) subscribe(_ context.Context, qm queryModel, query backend.DataQuery, pCtx backend.PluginContext, natsConn *nats.Conn) backend.DataResponse {
+func (ds *Datasource) subscribe(_ context.Context, qm queryModel, nc *nats.Conn) backend.DataResponse {
 	requestUuid := uuid.NewString()
 	if len(qm.StreamRequestUuidForTesting) > 0 {
 		requestUuid = qm.StreamRequestUuidForTesting
@@ -291,23 +290,23 @@ func (ds *Datasource) subscribe(_ context.Context, qm queryModel, query backend.
 	var subscription *nats.Subscription
 	var err error
 	var firstFrame *data.Frame
-	subscription, err = natsConn.Subscribe(qm.NatsSubject, func(msg *nats.Msg) {
+	subscription, err = nc.Subscribe(qm.NatsSubject, func(msg *nats.Msg) {
 		select {
 		case <-ctx.Done():
 			log.DefaultLogger.Debug("Cancelling NATS subscription")
-			subscription.Unsubscribe()
+			_ = subscription.Unsubscribe()
 		default:
 			log.DefaultLogger.Debug("Received NATS Message")
 			// extend TTL everytime we receive a msg.
 			ds.streamResponsesSoFar.Touch(requestUuid)
 			i++
-			frame, err := goja.ConvertMessage(context.Background(), msg, qm.JsFn)
+			frame, err := goja.ConvertMessage(nc, msg, qm.JsFn)
 			if err != nil {
 				log.DefaultLogger.Error(fmt.Sprintf("could not convert message %d - error in tamarin script: %s", i, err))
 
 				sr.currentErr = fmt.Errorf("could not convert message %d - error in tamarin script: %w", i, err)
 				sr.onNewMessages <- true
-				subscription.Unsubscribe()
+				_ = subscription.Unsubscribe()
 				if i == 1 {
 					// for 1st message, answer synchronously
 					wg.Done()
@@ -319,7 +318,7 @@ func (ds *Datasource) subscribe(_ context.Context, qm queryModel, query backend.
 
 				sr.currentErr = fmt.Errorf("could not convert message %d - could not be converted to data frame: %w", i, err)
 				sr.onNewMessages <- true
-				subscription.Unsubscribe()
+				_ = subscription.Unsubscribe()
 				if i == 1 {
 					// for 1st message, answer synchronously
 					wg.Done()
@@ -362,6 +361,23 @@ func (ds *Datasource) subscribe(_ context.Context, qm queryModel, query backend.
 	return backend.DataResponse{
 		Frames: data.Frames{
 			firstFrame,
+		},
+		Status: backend.StatusOK,
+	}
+}
+
+// script allows free-form scripts
+// TODO explain how done
+func (ds *Datasource) script(_ context.Context, qm queryModel, natsConn *nats.Conn) backend.DataResponse {
+	frame, err := goja.RunScript(natsConn, qm.JsFn)
+
+	if err != nil {
+		return backend.ErrDataResponse(backend.StatusBadRequest, "error handling 1st message: "+err.Error())
+	}
+
+	return backend.DataResponse{
+		Frames: data.Frames{
+			frame,
 		},
 		Status: backend.StatusOK,
 	}

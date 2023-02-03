@@ -136,6 +136,23 @@ func TestValid(t *testing.T) {
 				`,
 			},
 		},
+		{
+			name: `SCRIPT_1_orchestration`,
+			responses: MockNatsResponsesForSubject{
+				"json1": `{"s1": "my string", "i1": 42, "f1": 42.0, "b1": true}`,
+				"json2": `{"s2": "my string other", "i1": 21, "f1": 12.0}`,
+			},
+			q: queryModel{
+				QueryType: "SCRIPT",
+				JsFn: `
+					const msg1 = nc.Request("json1", "", "50ms");
+					const msg2 = nc.Request("json2", "", "50ms");
+					const parsed1 = JSON.parse(msg1.Data);
+					const parsed2 = JSON.parse(msg2.Data);
+					return [parsed1, parsed2];
+				`,
+			},
+		},
 	}
 
 	for _, testcase := range cases {
@@ -159,8 +176,8 @@ func TestValid(t *testing.T) {
 			)
 			AssertNoError(t, err)
 			queryResponse := resp.Responses["A"]
-			AssertEqual(t, backend.StatusOK, queryResponse.Status, "resp.Responses[0].Status")
 			AssertNoError(t, queryResponse.Error)
+			AssertEqual(t, backend.StatusOK, queryResponse.Status, "resp.Responses[0].Status")
 
 			// TODO: make updateFile configurable
 			experimental.CheckGoldenJSONResponse(t, "golden", testcase.name, &queryResponse, true)
