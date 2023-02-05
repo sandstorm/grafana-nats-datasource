@@ -31,7 +31,7 @@ function onQueryTypeChange<TVal>(props: Props, fieldName: string) {
     }
 }
 
-type SCRIPT_IDS = "default" | "headers";
+type SCRIPT_IDS = "default" | "headers" | "scripting_multipleRequests" | "scripting_multipleResponses";
 
 const scripts: {  [prop in SCRIPT_IDS]: string} = {
     default: `
@@ -50,10 +50,49 @@ const scripts: {  [prop in SCRIPT_IDS]: string} = {
         
         return row
     `,
+    scripting_multipleRequests: `
+        // do two requests on different NATS subjects (json1 and json2)
+        const msg1 = nc.Request("json1", "", "50ms");
+        const msg2 = nc.Request("json2", "", "50ms");
+        
+        // parse the response data as JSON
+        const parsed1 = JSON.parse(msg1.Data);
+        const parsed2 = JSON.parse(msg2.Data);
+        
+        // return the concatenated list
+        return [parsed1, parsed2];
+    `,
+    scripting_multipleResponses: `
+        // Sometimes, you receive *multiple responses* for a single request, f.e. when
+        // triggering $SYS.REQ.SERVER.PING in the SYS account, you will receive one answer
+        // per server.
+        //
+        // That's why we manually create an inbox for the reply; and poll it as
+        // long as there are messages.
+        const result = [];
+        
+        const inbox = nc.NewInbox();
+        // The ordering is crucial: we first need to create the subscription, before
+        // sending the request (otherwise we might miss the response).
+        const subscription = nc.SubscribeSync(inbox);
+        nc.PublishRequest("$SYS.REQ.SERVER.PING", inbox, "");
+        while(true) {
+          // we poll until we do not receive a message anymore within the given timeout.
+          const msg = subscription.NextMsg("50ms");
+          if (!msg) {
+            // ... when this happens, we return the accumulated result.
+            return result;
+          }
+          // here, we parse the given message.
+          const parsed = JSON.parse(msg.Data);
+          delete parsed.statsz.routes;
+          result.push(parsed);
+    }
+    `
 };
 
 
-function explanationForQueryType(queryType: QueryTypes): { title: string, content: React.ReactNode, mapFnLabel: string, mapFnDescription: React.ReactNode, mapFnExamples?: CascaderOption[] } {
+function explanationForQueryType(queryType: QueryTypes): { title: string, content: React.ReactNode, mapFnLabel: string, mapFnDescription: React.ReactNode, mapFnExamples?: Array<CascaderOption&{value: SCRIPT_IDS}> } {
     if (queryType === "REQUEST_REPLY") {
         return {
             title: 'Request/Reply mode explained',
@@ -81,12 +120,12 @@ function explanationForQueryType(queryType: QueryTypes): { title: string, conten
                 {
                     label: 'Default script',
                     title: 'The most simple script which is used by default on the backend.',
-                    value: "default",
+                    value: "default" as "default"
                 },
                 {
                     label: 'display NATS message headers',
                     title: 'display NATS message headers in Grafana',
-                    value: "headers"
+                    value: "headers" as "headers"
                 }
             ]
         };
@@ -117,12 +156,12 @@ function explanationForQueryType(queryType: QueryTypes): { title: string, conten
                 {
                     label: 'Default script',
                     title: 'The most simple script which is used by default on the backend.',
-                    value: "default"
+                    value: "default" as "default"
                 },
                 {
                     label: 'display NATS message headers',
                     title: 'display NATS message headers in Grafana',
-                    value: "headers"
+                    value: "headers" as "headers"
                 }
             ]
 
@@ -154,12 +193,21 @@ function explanationForQueryType(queryType: QueryTypes): { title: string, conten
                     <a href="https://pkg.go.dev/github.com/nats-io/nats.go#Conn.Subscribe">nc.Subscribe()</a>,
                     <a href="https://pkg.go.dev/github.com/nats-io/nats.go#Conn.Request">nc.Request()</a><br/> (or any
                     other interaction).<br/>
-                    API: <code>d("1s")</code>create a time.Duration<br/>
                     Supported Return values: <a href="https://pkg.go.dev/github.com/grafana/grafana-plugin-sdk-go@v0.147.0/data#Frame"
                     target="_blank" rel="noreferrer">data.Frame</a> or an error.
                 </>,
             mapFnExamples: [
+                {
+                    label: 'multiple requests',
+                    title: 'do multiple requests and concatenate the responses',
+                    value: "scripting_multipleRequests" as "scripting_multipleRequests"
+                },
+                {
+                    label: 'request with responses',
+                    title: 'a request which triggers multiple responses',
+                    value: "scripting_multipleResponses" as "scripting_multipleResponses"
 
+                }
             ]
 
         };

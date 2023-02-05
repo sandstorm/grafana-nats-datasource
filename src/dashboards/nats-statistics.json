@@ -30,6 +30,275 @@
   "panels": [
     {
       "datasource": {
+        "type": "datasource",
+        "uid": "-- Dashboard --"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 11,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "uniqueValues"
+          ],
+          "fields": "/.*/",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "9.2.5",
+      "targets": [
+        {
+          "datasource": {
+            "type": "datasource",
+            "uid": "-- Dashboard --"
+          },
+          "panelId": 4,
+          "refId": "A",
+          "withTransforms": false
+        }
+      ],
+      "title": "Overview",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "server.cluster": false,
+              "server.host": true,
+              "server.id": true,
+              "server.jetstream": false,
+              "server.name": false,
+              "server.seq": true,
+              "server.time": true,
+              "server.ver": false,
+              "statsz.active_accounts": true,
+              "statsz.active_servers": false,
+              "statsz.connections": true,
+              "statsz.cores": true,
+              "statsz.cpu": true,
+              "statsz.mem": true,
+              "statsz.received.bytes": true,
+              "statsz.received.msgs": true,
+              "statsz.sent.bytes": true,
+              "statsz.sent.msgs": true,
+              "statsz.slow_consumers": true,
+              "statsz.start": true,
+              "statsz.subscriptions": true,
+              "statsz.total_connections": true
+            },
+            "indexByName": {
+              "server.cluster": 0,
+              "server.host": 2,
+              "server.id": 3,
+              "server.jetstream": 4,
+              "server.name": 1,
+              "server.seq": 5,
+              "server.time": 6,
+              "server.ver": 7,
+              "statsz.active_accounts": 8,
+              "statsz.active_servers": 9,
+              "statsz.connections": 10,
+              "statsz.cores": 11,
+              "statsz.cpu": 12,
+              "statsz.mem": 13,
+              "statsz.received.bytes": 14,
+              "statsz.received.msgs": 15,
+              "statsz.sent.bytes": 16,
+              "statsz.sent.msgs": 17,
+              "statsz.slow_consumers": 18,
+              "statsz.start": 19,
+              "statsz.subscriptions": 20,
+              "statsz.total_connections": 21
+            },
+            "renameByName": {
+              "server.cluster": "Cluster",
+              "server.jetstream": "JS Enabled?"
+            }
+          }
+        }
+      ],
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Dashboard --"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "statsz.mem|bytes"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bytes"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 6
+      },
+      "id": 12,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "uniqueValues"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "9.2.5",
+      "targets": [
+        {
+          "datasource": {
+            "type": "datasource",
+            "uid": "-- Dashboard --"
+          },
+          "panelId": 4,
+          "refId": "A",
+          "withTransforms": false
+        }
+      ],
+      "title": "Overview",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "server.cluster": true,
+              "server.host": true,
+              "server.id": true,
+              "server.jetstream": true,
+              "server.name": false,
+              "server.seq": true,
+              "server.time": true,
+              "server.ver": true,
+              "statsz.active_accounts": false,
+              "statsz.active_servers": true,
+              "statsz.connections": false,
+              "statsz.cores": true,
+              "statsz.cpu": true,
+              "statsz.mem": false,
+              "statsz.received.bytes": false,
+              "statsz.received.msgs": false,
+              "statsz.sent.bytes": false,
+              "statsz.sent.msgs": false,
+              "statsz.slow_consumers": false,
+              "statsz.start": true,
+              "statsz.subscriptions": false,
+              "statsz.total_connections": true
+            },
+            "indexByName": {
+              "server.cluster": 0,
+              "server.host": 2,
+              "server.id": 3,
+              "server.jetstream": 4,
+              "server.name": 1,
+              "server.seq": 5,
+              "server.time": 6,
+              "server.ver": 7,
+              "statsz.active_accounts": 8,
+              "statsz.active_servers": 9,
+              "statsz.connections": 10,
+              "statsz.cores": 11,
+              "statsz.cpu": 12,
+              "statsz.mem": 13,
+              "statsz.received.bytes": 14,
+              "statsz.received.msgs": 15,
+              "statsz.sent.bytes": 16,
+              "statsz.sent.msgs": 17,
+              "statsz.slow_consumers": 18,
+              "statsz.start": 19,
+              "statsz.subscriptions": 20,
+              "statsz.total_connections": 21
+            },
+            "renameByName": {
+              "server.cluster": "Cluster",
+              "server.jetstream": "JS Enabled?",
+              "server.name": "",
+              "statsz.active_accounts": ""
+            }
+          }
+        }
+      ],
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      },
+      "id": 9,
+      "panels": [],
+      "title": "Details",
+      "type": "row"
+    },
+    {
+      "datasource": {
         "type": "sandstormmedia-nats-datasource",
         "uid": "nats-system"
       },
@@ -41,7 +310,126 @@
           "custom": {
             "align": "auto",
             "displayMode": "auto",
-            "inspect": false
+            "inspect": false,
+            "minWidth": 80
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "statsz.connections"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 77
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 13
+      },
+      "id": 4,
+      "options": {
+        "footer": {
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": []
+      },
+      "pluginVersion": "9.2.5",
+      "targets": [
+        {
+          "datasource": {
+            "type": "sandstormmedia-nats-datasource",
+            "uid": "nats-system"
+          },
+          "jqExpression": "",
+          "jsFn": "// $SYS.REQ.SERVER.PING is a bit special because a single request\n// will receive *multiple* answers (one for each server).\n//\n// That's why we manually create an inbox for the reply; and poll it as\n// long as there are messages.\nconst result = [];\n\nconst inbox = nc.NewInbox();\n// The ordering is crucial: we first need to create the subscription, before\n// sending the request (otherwise we might miss the response).\nconst subscription = nc.SubscribeSync(inbox);\nnc.PublishRequest(\"$SYS.REQ.SERVER.PING\", inbox, \"\");\nwhile(true) {\n  // we poll until we do not receive a message anymore within the given timeout.\n  const msg = subscription.NextMsg(\"50ms\");\n  if (!msg) {\n    // ... when this happens, we return the accumulated result.\n    return result;\n  }\n  // here, we parse the given message.\n  const parsed = JSON.parse(msg.Data);\n  delete parsed.statsz.routes;\n  result.push(parsed);\n}",
+          "natsSubject": "$SYS.REQ.SERVER.PING",
+          "queryType": "SCRIPT",
+          "refId": "A",
+          "requestTimeout": "10s"
+        }
+      ],
+      "title": "Servers",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "server.id": true,
+              "server.name": false,
+              "server.time": true
+            },
+            "indexByName": {
+              "server.host": 0,
+              "server.id": 1,
+              "server.jetstream": 7,
+              "server.name": 2,
+              "server.seq": 8,
+              "server.time": 9,
+              "server.ver": 3,
+              "statsz.active_accounts": 10,
+              "statsz.active_servers": 11,
+              "statsz.connections": 4,
+              "statsz.cores": 12,
+              "statsz.cpu": 6,
+              "statsz.mem": 5,
+              "statsz.received.bytes": 13,
+              "statsz.received.msgs": 14,
+              "statsz.sent.bytes": 15,
+              "statsz.sent.msgs": 16,
+              "statsz.slow_consumers": 17,
+              "statsz.start": 18,
+              "statsz.subscriptions": 19,
+              "statsz.total_connections": 20
+            },
+            "renameByName": {}
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "sandstormmedia-nats-datasource",
+        "uid": "nats-system"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto",
+            "inspect": false,
+            "minWidth": 80
           },
           "mappings": [],
           "thresholds": {
@@ -63,10 +451,10 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
-        "y": 0
+        "x": 12,
+        "y": 13
       },
-      "id": 4,
+      "id": 5,
       "options": {
         "footer": {
           "fields": "",
@@ -85,13 +473,41 @@
             "uid": "nats-system"
           },
           "jqExpression": "",
+          "jsFn": "// $SYS.REQ.SERVER.PING is a bit special because a single request\n// will receive *multiple* answers (one for each server).\n//\n// That's why we manually create an inbox for the reply; and poll it as\n// long as there are messages.\nconst result = [];\n\nconst inbox = nc.NewInbox();\n// The ordering is crucial: we first need to create the subscription, before\n// sending the request (otherwise we might miss the response).\nconst subscription = nc.SubscribeSync(inbox);\nnc.PublishRequest(\"$SYS.REQ.SERVER.PING\", inbox, \"\");\nwhile(true) {\n  // we poll until we do not receive a message anymore within the given timeout.\n  const msg = subscription.NextMsg(\"50ms\");\n  if (!msg) {\n    // ... when this happens, we return the accumulated result.\n    return result;\n  }\n  // here, we parse the given message.\n  const parsed = JSON.parse(msg.Data);\n  result.push(...parsed.statsz.routes.map(route => ({\n    serverName: parsed.server.name,\n    ...route\n  })));\n}",
           "natsSubject": "$SYS.REQ.SERVER.PING",
-          "queryType": "REQUEST_REPLY",
+          "queryType": "SCRIPT",
           "refId": "A",
           "requestTimeout": "10s"
         }
       ],
-      "title": "Panel Title",
+      "title": "Routes",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "server.id": true,
+              "server.name": false,
+              "server.time": true
+            },
+            "indexByName": {
+              "name": 1,
+              "pending": 2,
+              "received.bytes": 3,
+              "received.msgs": 4,
+              "rid": 5,
+              "sent.bytes": 6,
+              "sent.msgs": 7,
+              "serverName": 0
+            },
+            "renameByName": {
+              "name": "Target Server",
+              "pending": "",
+              "serverName": "Server"
+            }
+          }
+        }
+      ],
       "type": "table"
     },
     {
@@ -103,7 +519,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 8
+        "y": 21
       },
       "id": 2,
       "options": {
@@ -112,12 +528,226 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "# Documentation\n\nStatistics from the NATS server, by checking out subjects from [here](https://docs.nats.io/running-a-nats-service/configuration/sys_accounts#available-events-and-services)\n\n\n## Developing this panel\n\n\n```\n# get general infos\nnats --user=sys --password=pass request '$SYS.REQ.SERVER.PING' ''\nnats --user=sys --password=pass request '$SYS.REQ.SERVER.PING.VARZ' ''\nnats --user=sys --password=pass request '$SYS.REQ.SERVER.PING.CONNZ' ''\n```",
+        "content": "# Documentation\n\nStatistics from the NATS server, by checking out subjects from [here](https://docs.nats.io/running-a-nats-service/configuration/sys_accounts#available-events-and-services)\n\n\n## Developing this panel\n\n\n```\n# get general infos\nnats --user=sys --password=pass request '$SYS.REQ.SERVER.PING' ''\nnats --user=sys --password=pass request '$SYS.REQ.SERVER.PING.VARZ' ''\nnats --user=sys --password=pass request '$SYS.REQ.SERVER.PING.CONNZ' ''\nnats --user=sys --password=pass request '$SYS.REQ.SERVER.PING.SUBSZ' '{\"subscriptions\": true}}'\n```",
         "mode": "markdown"
       },
       "pluginVersion": "9.2.5",
-      "title": "Panel Title",
+      "title": "Docs",
       "type": "text"
+    },
+    {
+      "datasource": {
+        "type": "sandstormmedia-nats-datasource",
+        "uid": "nats-system"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto",
+            "inspect": false,
+            "minWidth": 80
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 21
+      },
+      "id": 6,
+      "options": {
+        "footer": {
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "9.2.5",
+      "targets": [
+        {
+          "datasource": {
+            "type": "sandstormmedia-nats-datasource",
+            "uid": "nats-system"
+          },
+          "jqExpression": "",
+          "jsFn": "// $SYS.REQ.SERVER.PING is a bit special because a single request\n// will receive *multiple* answers (one for each server).\n//\n// That's why we manually create an inbox for the reply; and poll it as\n// long as there are messages.\nconst result = [];\n\nconst inbox = nc.NewInbox();\n// The ordering is crucial: we first need to create the subscription, before\n// sending the request (otherwise we might miss the response).\nconst subscription = nc.SubscribeSync(inbox);\nnc.PublishRequest(\"$SYS.REQ.SERVER.PING.CONNZ\", inbox, \"\");\nwhile(true) {\n  // we poll until we do not receive a message anymore within the given timeout.\n  const msg = subscription.NextMsg(\"100ms\");\n  if (!msg) {\n    // ... when this happens, we return the accumulated result.\n    return result;\n  }\n  // here, we parse the given message.\n  const parsed = JSON.parse(msg.Data);\n  result.push(...parsed.data.connections.map(connection => ({\n    serverName: parsed.server.name,\n    ...connection\n  })));\n}",
+          "natsSubject": "$SYS.REQ.SERVER.PING",
+          "queryType": "SCRIPT",
+          "refId": "A",
+          "requestTimeout": "10s"
+        }
+      ],
+      "title": "Client Connections",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "server.id": true,
+              "server.name": false,
+              "server.time": true
+            },
+            "indexByName": {
+              "name": 1,
+              "pending": 2,
+              "received.bytes": 3,
+              "received.msgs": 4,
+              "rid": 5,
+              "sent.bytes": 6,
+              "sent.msgs": 7,
+              "serverName": 0
+            },
+            "renameByName": {
+              "name": "Client",
+              "pending": "",
+              "serverName": "Server"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "sandstormmedia-nats-datasource",
+        "uid": "nats-system"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto",
+            "inspect": false,
+            "minWidth": 50,
+            "width": 80
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "subject"
+            },
+            "properties": [
+              {
+                "id": "custom.width"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 29
+      },
+      "id": 7,
+      "options": {
+        "footer": {
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "9.2.5",
+      "targets": [
+        {
+          "datasource": {
+            "type": "sandstormmedia-nats-datasource",
+            "uid": "nats-system"
+          },
+          "jqExpression": "",
+          "jsFn": "// $SYS.REQ.SERVER.PING is a bit special because a single request\n// will receive *multiple* answers (one for each server).\n//\n// That's why we manually create an inbox for the reply; and poll it as\n// long as there are messages.\nconst result = [];\n\nconst inbox = nc.NewInbox();\n// The ordering is crucial: we first need to create the subscription, before\n// sending the request (otherwise we might miss the response).\nconst subscription = nc.SubscribeSync(inbox);\nnc.PublishRequest(\"$SYS.REQ.SERVER.PING.SUBSZ\", inbox, '{\"subscriptions\": true}');\nwhile(true) {\n  // we poll until we do not receive a message anymore within the given timeout.\n  const msg = subscription.NextMsg(\"100ms\");\n  if (!msg) {\n    // ... when this happens, we return the accumulated result.\n    return result;\n  }\n  // here, we parse the given message.\n  const parsed = JSON.parse(msg.Data);\n  result.push(...parsed.data.subscriptions_list.map(sub => ({\n    serverName: parsed.server.name,\n    ...sub\n  })));\n}",
+          "natsSubject": "$SYS.REQ.SERVER.PING",
+          "queryType": "SCRIPT",
+          "refId": "A",
+          "requestTimeout": "10s"
+        }
+      ],
+      "title": "Subscriptions",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "server.id": true,
+              "server.name": false,
+              "server.time": true
+            },
+            "indexByName": {
+              "name": 1,
+              "pending": 2,
+              "received.bytes": 3,
+              "received.msgs": 4,
+              "rid": 5,
+              "sent.bytes": 6,
+              "sent.msgs": 7,
+              "serverName": 0
+            },
+            "renameByName": {
+              "name": "Target Server",
+              "pending": "",
+              "serverName": "Server"
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "desc": true,
+                "field": "msgs"
+              }
+            ]
+          }
+        }
+      ],
+      "type": "table"
     }
   ],
   "schemaVersion": 37,
@@ -134,6 +764,6 @@
   "timezone": "",
   "title": "NATS Statistics",
   "uid": "OCqagroVk",
-  "version": 4,
+  "version": 11,
   "weekStart": ""
 }

@@ -14,11 +14,68 @@ export interface Props {
 
 // extra libraries
 const libSource = `
-declare class Facts {
+declare class Conn {
     /**
-     * Returns the next fact
+     * AuthRequired will return if the connected server requires authorization.
      */
-    static next():string
+    AuthRequired(): boolean;
+    
+    /**
+     * Request/Reply
+     */
+    Request(subj: string, data: string, timeout: string): Msg;
+    
+    /**
+     * Publish publishes the data argument to the given subject. The data argument is left untouched and needs to be correctly interpreted on the receiver. 
+     */
+    Publish(subj: string, data: string): void;
+    
+    /**
+     * PublishMsg publishes the Msg structure, which includes the Subject, an optional Reply and an optional Data field. 
+     */
+    PublishMsg(m: Msg): void;
+    
+    /**
+     * PublishRequest will perform a Publish() expecting a response on the reply subject. Use Request() for automatically waiting for a response inline. 
+     */
+    PublishRequest(subj: string, reply: string, data: string);
+
+    
+    SubscribeSync(subj: string): Subscription;
+    
+    NewInbox(): string;
+}
+
+declare var nc: Conn;
+declare namespace nats {
+    function NewMsg(subject: string): Msg;
+}
+
+declare class Msg {
+    Subject: string;
+    Reply: string;
+    Header: Header;
+    /**
+     * The message payload
+     */
+    Data: string;
+}
+
+declare type Header = {
+    [key: string]: string[];
+    /**
+     * Get gets the first value associated with the given key. It is case-sensitive. 
+     */
+    Get(key: string): string;
+    /**
+     * Values returns all values associated with the given key. It is case-sensitive.
+     */
+    Values(key: string): string[];
+}
+
+declare class Subscription {
+    NextMsg(timeout: string): Msg;
+}
 `;
 const libUri = 'ts:filename/facts.d.ts';
 
@@ -43,7 +100,7 @@ export function TamarinCodeEditorField({expression: expression, onChange}: React
             // We may wish to consider abstracting it into the grafana/ui repo in the future
             const updateElementHeight = () => {
                 const containerDiv = containerRef.current;
-                if (containerDiv !== null && editor.getContentHeight() < 200) {
+                if (containerDiv !== null) {
                     const pixelHeight = Math.max(100, editor.getContentHeight());
                     containerDiv.style.height = `${pixelHeight}px`;
                     containerDiv.style.width = '100%';
@@ -91,7 +148,10 @@ export function TamarinCodeEditorField({expression: expression, onChange}: React
                     monaco.languages.typescript.javascriptDefaults.addExtraLib(libSource, libUri);
                     // When resolving definitions and references, the editor will try to use created models.
                     // Creating a model for the library allows "peek definition/references" commands to work with the library.
-                    monaco.editor.createModel(libSource, 'typescript', monaco.Uri.parse(libUri));
+                    const parsedLibUri = monaco.Uri.parse(libUri)
+                    if (!monaco.editor.getModel(parsedLibUri)) {
+                        monaco.editor.createModel(libSource, 'typescript', parsedLibUri);
+                    }
 
                     // see https://github.com/microsoft/monaco-editor/issues/1661#issuecomment-777289233
                     monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({

@@ -103,6 +103,16 @@ function _setup(_nats, _bytesToStr, _strToBytes, _parseDuration) {
         return nats;
 	}
     
+    function nullOnTimeout(func) {
+        return function() {
+            try {
+            	return func.apply(this, arguments);
+			} catch (e) {
+                return null;
+			}
+        }
+	}
+    
     function wrapSubscription(__subscription) {
         if (!__subscription) {
             // keep falsy objects
@@ -110,7 +120,7 @@ function _setup(_nats, _bytesToStr, _strToBytes, _parseDuration) {
         }
         
         const subscription = Object.create(__subscription);
-        subscription.NextMsg = (timeout) => wrapMsg(__subscription.NextMsg(_parseDuration(timeout)));
+        subscription.NextMsg = nullOnTimeout((timeout) => wrapMsg(__subscription.NextMsg(_parseDuration(timeout))));
         subscription.NextMsgWithContext = (ctx) => wrapMsg(__subscription.NextMsgWithContext(ctx));
         
         return subscription;

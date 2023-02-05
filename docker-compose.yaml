@@ -26,5 +26,22 @@ services:
     command:
       - "-c"
       - /nats-server.conf
+      - --name
+      - nats
+    volumes:
+      - "./provisioning/nats-server.conf:/nats-server.conf"
+
+  nats2:
+    container_name: nats2
+    ports:
+      - '4223:4222'
+    image: nats:2.9.11
+    command:
+      - "-c"
+      - /nats-server.conf
+      - --name
+      - nats2
+      - -routes
+      - nats://nats:4248
     volumes:
       - "./provisioning/nats-server.conf:/nats-server.conf"
