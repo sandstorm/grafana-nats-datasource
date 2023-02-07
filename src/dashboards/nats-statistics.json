@@ -513,7 +513,48 @@
     {
       "datasource": {
         "type": "sandstormmedia-nats-datasource",
-        "uid": "nats-default"
+        "uid": "nats-system"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto",
+            "inspect": false,
+            "minWidth": 50,
+            "width": 80
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "subject"
+            },
+            "properties": [
+              {
+                "id": "custom.width"
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 8,
@@ -521,19 +562,73 @@
         "x": 0,
         "y": 21
       },
-      "id": 2,
+      "id": 7,
       "options": {
-        "code": {
-          "language": "plaintext",
-          "showLineNumbers": false,
-          "showMiniMap": false
+        "footer": {
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
         },
-        "content": "# Documentation\n\nStatistics from the NATS server, by checking out subjects from [here](https://docs.nats.io/running-a-nats-service/configuration/sys_accounts#available-events-and-services)\n\n\n## Developing this panel\n\n\n```\n# get general infos\nnats --user=sys --password=pass request '$SYS.REQ.SERVER.PING' ''\nnats --user=sys --password=pass request '$SYS.REQ.SERVER.PING.VARZ' ''\nnats --user=sys --password=pass request '$SYS.REQ.SERVER.PING.CONNZ' ''\nnats --user=sys --password=pass request '$SYS.REQ.SERVER.PING.SUBSZ' '{\"subscriptions\": true}}'\n```",
-        "mode": "markdown"
+        "showHeader": true
       },
       "pluginVersion": "9.2.5",
-      "title": "Docs",
-      "type": "text"
+      "targets": [
+        {
+          "datasource": {
+            "type": "sandstormmedia-nats-datasource",
+            "uid": "nats-system"
+          },
+          "jqExpression": "",
+          "jsFn": "// $SYS.REQ.SERVER.PING is a bit special because a single request\n// will receive *multiple* answers (one for each server).\n//\n// That's why we manually create an inbox for the reply; and poll it as\n// long as there are messages.\nconst result = [];\n\nconst inbox = nc.NewInbox();\n// The ordering is crucial: we first need to create the subscription, before\n// sending the request (otherwise we might miss the response).\nconst subscription = nc.SubscribeSync(inbox);\nnc.PublishRequest(\"$SYS.REQ.SERVER.PING.SUBSZ\", inbox, '{\"subscriptions\": true}');\nwhile(true) {\n  // we poll until we do not receive a message anymore within the given timeout.\n  const msg = subscription.NextMsg(\"100ms\");\n  if (!msg) {\n    // ... when this happens, we return the accumulated result.\n    return result;\n  }\n  // here, we parse the given message.\n  const parsed = JSON.parse(msg.Data);\n  result.push(...parsed.data.subscriptions_list.map(sub => ({\n    serverName: parsed.server.name,\n    ...sub\n  })));\n}",
+          "natsSubject": "$SYS.REQ.SERVER.PING",
+          "queryType": "SCRIPT",
+          "refId": "A",
+          "requestTimeout": "10s"
+        }
+      ],
+      "title": "Subscriptions",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "server.id": true,
+              "server.name": false,
+              "server.time": true
+            },
+            "indexByName": {
+              "name": 1,
+              "pending": 2,
+              "received.bytes": 3,
+              "received.msgs": 4,
+              "rid": 5,
+              "sent.bytes": 6,
+              "sent.msgs": 7,
+              "serverName": 0
+            },
+            "renameByName": {
+              "name": "Target Server",
+              "pending": "",
+              "serverName": "Server"
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "desc": true,
+                "field": "msgs"
+              }
+            ]
+          }
+        }
+      ],
+      "type": "table"
     },
     {
       "datasource": {
@@ -633,121 +728,27 @@
     {
       "datasource": {
         "type": "sandstormmedia-nats-datasource",
-        "uid": "nats-system"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "custom": {
-            "align": "auto",
-            "displayMode": "auto",
-            "inspect": false,
-            "minWidth": 50,
-            "width": 80
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "subject"
-            },
-            "properties": [
-              {
-                "id": "custom.width"
-              }
-            ]
-          }
-        ]
+        "uid": "nats-default"
       },
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
+        "x": 0,
         "y": 29
       },
-      "id": 7,
+      "id": 2,
       "options": {
-        "footer": {
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
         },
-        "showHeader": true
+        "content": "# Documentation\n\nStatistics from the NATS server, by checking out subjects from [here](https://docs.nats.io/running-a-nats-service/configuration/sys_accounts#available-events-and-services)\n\n\n## Developing this panel\n\n\n```\n# get general infos\nnats --user=sys --password=pass request '$SYS.REQ.SERVER.PING' ''\nnats --user=sys --password=pass request '$SYS.REQ.SERVER.PING.VARZ' ''\nnats --user=sys --password=pass request '$SYS.REQ.SERVER.PING.CONNZ' ''\nnats --user=sys --password=pass request '$SYS.REQ.SERVER.PING.SUBSZ' '{\"subscriptions\": true}}'\n```",
+        "mode": "markdown"
       },
       "pluginVersion": "9.2.5",
-      "targets": [
-        {
-          "datasource": {
-            "type": "sandstormmedia-nats-datasource",
-            "uid": "nats-system"
-          },
-          "jqExpression": "",
-          "jsFn": "// $SYS.REQ.SERVER.PING is a bit special because a single request\n// will receive *multiple* answers (one for each server).\n//\n// That's why we manually create an inbox for the reply; and poll it as\n// long as there are messages.\nconst result = [];\n\nconst inbox = nc.NewInbox();\n// The ordering is crucial: we first need to create the subscription, before\n// sending the request (otherwise we might miss the response).\nconst subscription = nc.SubscribeSync(inbox);\nnc.PublishRequest(\"$SYS.REQ.SERVER.PING.SUBSZ\", inbox, '{\"subscriptions\": true}');\nwhile(true) {\n  // we poll until we do not receive a message anymore within the given timeout.\n  const msg = subscription.NextMsg(\"100ms\");\n  if (!msg) {\n    // ... when this happens, we return the accumulated result.\n    return result;\n  }\n  // here, we parse the given message.\n  const parsed = JSON.parse(msg.Data);\n  result.push(...parsed.data.subscriptions_list.map(sub => ({\n    serverName: parsed.server.name,\n    ...sub\n  })));\n}",
-          "natsSubject": "$SYS.REQ.SERVER.PING",
-          "queryType": "SCRIPT",
-          "refId": "A",
-          "requestTimeout": "10s"
-        }
-      ],
-      "title": "Subscriptions",
-      "transformations": [
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "server.id": true,
-              "server.name": false,
-              "server.time": true
-            },
-            "indexByName": {
-              "name": 1,
-              "pending": 2,
-              "received.bytes": 3,
-              "received.msgs": 4,
-              "rid": 5,
-              "sent.bytes": 6,
-              "sent.msgs": 7,
-              "serverName": 0
-            },
-            "renameByName": {
-              "name": "Target Server",
-              "pending": "",
-              "serverName": "Server"
-            }
-          }
-        },
-        {
-          "id": "sortBy",
-          "options": {
-            "fields": {},
-            "sort": [
-              {
-                "desc": true,
-                "field": "msgs"
-              }
-            ]
-          }
-        }
-      ],
-      "type": "table"
+      "title": "Docs",
+      "type": "text"
     }
   ],
   "schemaVersion": 37,
@@ -764,6 +765,6 @@
   "timezone": "",
   "title": "NATS Statistics",
   "uid": "OCqagroVk",
-  "version": 11,
+  "version": 12,
   "weekStart": ""
 }
