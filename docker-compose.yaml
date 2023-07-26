@@ -2,7 +2,6 @@ version: '3.0'
 
 services:
   grafana:
-    container_name: 'sandstormmedia-nats-datasource'
     depends_on:
       - nats
     environment:
@@ -19,7 +18,6 @@ services:
       - ./provisioning:/etc/grafana/provisioning
       - ./src/dashboards:/opt/grafana-dashboards
   nats:
-    container_name: nats
     ports:
       - '4222:4222'
     image: nats:2.9.11
@@ -32,7 +30,6 @@ services:
       - "./provisioning/nats-server.conf:/nats-server.conf"
 
   nats2:
-    container_name: nats2
     ports:
       - '4223:4222'
     image: nats:2.9.11

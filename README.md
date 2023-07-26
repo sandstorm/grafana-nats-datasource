@@ -6,13 +6,13 @@
 
 ```
 dev setup
-dev grafana-build-backend
-dev grafana-watch-frontend
-dev grafana-up
+dev build-backend
+dev watch-frontend
+dev up
 # http://127.0.0.1:3000/plugins?filterBy=all&q=nats
 
 # to hot-reload the plugin:
-dev grafana-reload-plugin
+dev reload-plugin
 
 dev test-nats-server 
 ```

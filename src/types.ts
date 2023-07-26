@@ -13,7 +13,7 @@ export interface MyQuery extends DataQuery {
     jsFn: string;
 }
 
-export const QueryTypeOptions: SelectableValue<QueryTypes>[] = [
+export const QueryTypeOptions: Array<SelectableValue<QueryTypes>> = [
     {
         label: "Request/Reply",
         value: "REQUEST_REPLY",

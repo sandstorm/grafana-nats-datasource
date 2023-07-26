@@ -41,7 +41,7 @@ export class ConfigEditor extends PureComponent<Props, State> {
           </InlineField>
         </div>
 
-        {jsonData.authentication == "NKEY" ?
+        {jsonData.authentication === "NKEY" ?
           <>
             <div className="gf-form">
               <InlineField label="Public NKEY" tooltip="U...">
@@ -67,7 +67,7 @@ export class ConfigEditor extends PureComponent<Props, State> {
           </>
           : null}
 
-        {jsonData.authentication == "USERPASS" ?
+        {jsonData.authentication === "USERPASS" ?
             <>
               <div className="gf-form">
                 <InlineField label="Username">
@@ -91,7 +91,7 @@ export class ConfigEditor extends PureComponent<Props, State> {
             </>
             : null}
 
-        {jsonData.authentication == "JWT" ?
+        {jsonData.authentication === "JWT" ?
             <>
               <div className="gf-form">
                 <InlineField label="JWT">
