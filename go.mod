@@ -1,6 +1,6 @@
 module github.com/sandstormmedia/nats
 
-go 1.19
+go 1.20
 
 require (
 	github.com/dop251/goja v0.0.0-20230128084908-78b980256d04
