@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
-	"os"
 	"sync"
 )
 
@@ -30,25 +29,24 @@ func (ds *Datasource) connectNats(options *MyDataSourceOptions, secureOptions *M
 		} else if options.Authentication == AuthenticationUserPass {
 			ds.natsConn, ds.natsConnErr = nats.Connect(options.NatsUrl, nats.UserInfo(options.Username, secureOptions.Password))
 		} else if options.Authentication == AuthenticationJWT {
-			// WORKAROUND: store credentials in a temp-file
-			// TODO FIX ME
-			file, err := os.CreateTemp("", "tmp-jwt")
-			if err != nil {
-				ds.natsConnErr = fmt.Errorf("TODO: %w", err)
-				return
+			// Implemented after nats.UserCredentials(), but without temp file
+			jwtAsByte := []byte(secureOptions.Jwt)
+			userCB := func() (string, error) {
+				return nkeys.ParseDecoratedJWT(jwtAsByte)
 			}
-			defer os.Remove(file.Name())
-			_, err = file.Write([]byte(secureOptions.Jwt))
-			if err != nil {
-				ds.natsConnErr = fmt.Errorf("TODO: %w", err)
-				return
-			}
-			if err := file.Close(); err != nil {
-				ds.natsConnErr = fmt.Errorf("TODO: %w", err)
-				return
+			sigCB := func(nonce []byte) ([]byte, error) {
+				keyPair, err := nkeys.ParseDecoratedNKey(jwtAsByte)
+				if err != nil {
+					return nil, fmt.Errorf("unable to extract key pair from file: %w", err)
+				}
+				// Wipe our key on exit.
+				defer keyPair.Wipe()
+
+				sig, _ := keyPair.Sign(nonce)
+				return sig, nil
 			}
 
-			ds.natsConn, ds.natsConnErr = nats.Connect(options.NatsUrl, nats.UserCredentials(file.Name()))
+			ds.natsConn, ds.natsConnErr = nats.Connect(options.NatsUrl, nats.UserJWT(userCB, sigCB))
 		} else {
 			// TODO: TOKEN AUTH
 			ds.natsConnErr = fmt.Errorf("TODO")
