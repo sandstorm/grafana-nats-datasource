@@ -24,7 +24,6 @@ function setup() {
 function build-backend() {
   go mod tidy
   mage -v
-  cd ../
   _log_green "Built"
 }
 
@@ -46,15 +45,14 @@ function logs() {
   _log_green "Finished"
 }
 
-function grafana-reload-plugin() {
-  grafana-build-backend
-  cd sandstormmedia-nats-datasource
+function reload-plugin() {
+  build-backend
   # does not seem to work!?
   #docker compose exec grafana pkill gpx_nats_linux_amd64
   #docker compose exec grafana pkill gpx_nats_linux_arm64
 
   # this works :)
-  docker compose restart
+  docker-compose restart
   _log_green "Reloaded plugin"
 }
 
