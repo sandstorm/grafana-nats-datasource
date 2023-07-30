@@ -1,11 +1,11 @@
 import React, {PureComponent} from 'react';
-import {Alert, ButtonCascader, CascaderOption, Field, Input, RadioButtonGroup} from '@grafana/ui';
+import {Alert, ButtonCascader, CascaderOption, Field, FieldSet, Input, RadioButtonGroup} from '@grafana/ui';
 import {
     QueryEditorProps
 } from '@grafana/data';
 import {DataSource} from '../datasource';
 import {MyDataSourceOptions, MyQuery, QueryTypeOptions, QueryTypes} from '../types';
-import {TamarinCodeEditorField} from "./TamarinCodeEditorField";
+import {JavaScriptCodeEditorField} from "./JavaScriptCodeEditorField";
 
 type Props = QueryEditorProps<DataSource, MyQuery, MyDataSourceOptions>;
 
@@ -106,7 +106,7 @@ function explanationForQueryType(queryType: QueryTypes): { title: string, conten
                     <code>{'{"key1": "val1", "key2": "value2"}'}</code><br/>
                     <code>{'[{"key1": "val1", "key2": "value2"}, {"key1": "val3"}]'}</code></p>
 
-                <p>You can post-process each message via the Tamarin script language.</p>
+                <p>You can post-process each message via JavaScript.</p>
             </>,
             mapFnLabel: 'Response Mapping JavaScript',
             mapFnDescription: <>
@@ -144,7 +144,7 @@ function explanationForQueryType(queryType: QueryTypes): { title: string, conten
                 <p>JSON messages can be rendered directly - nested JSON is flattened. Example messages: <br/>
                     <code>{'{"key1": "val1", "key2": "value2"}'}</code></p>
 
-                <p>You can post-process each message via the Tamarin script language.</p>
+                <p>You can post-process each message via the JavaScript language.</p>
             </>,
             mapFnLabel: 'Message Mapping JavaScript',
             mapFnDescription: <>
@@ -225,53 +225,43 @@ export class QueryEditor extends PureComponent<Props> {
 
         const explanation = explanationForQueryType(query.queryType);
         return (
-            <div>
-                <div className="gf-form">
-                    <Field label="Query Type" description="How do we interact with the NAtS system">
-                        <RadioButtonGroup<QueryTypes>
-                            options={QueryTypeOptions}
-                            value={query.queryType}
-                            onChange={onQueryTypeChange(this.props, 'queryType')}
-                        />
-                    </Field>
-                </div>
-                <div className="gf-form">
-                    <Alert title={explanation.title} severity="info">
-                        {explanation.content}
-                    </Alert>
-                </div>
-                <div className="gf-form">
-                    <Field label="NATS Subject" description="the subject to request - f.e. foo.bar.baz">
-                        <Input
-                            className="width-27"
-                            value={query.natsSubject}
-                            onChange={onChange(this.props, 'natsSubject')}
-                        />
-                    </Field>
-                </div>
-                <div className="gf-form">
-                    <Field label="Request Timeout">
-                        <Input
-                            className="width-2"
-                            value={query.requestTimeout}
-                            onChange={onChange(this.props, 'requestTimeout')}
-                        />
-                    </Field>
-                </div>
-                <div className="gf-form">
-                    <Field label={explanation.mapFnLabel} style={{width: '100%'}}
-                           description={explanation.mapFnDescription}>
-                        <TamarinCodeEditorField
-                            expression={query.jsFn}
-                            onChange={onChangeJs(this.props, 'jsFn')}
-                        />
-                    </Field>
-                    {explanation.mapFnExamples ?
-                        <ButtonCascader options={explanation.mapFnExamples} onChange={(value) => onChangeJs(this.props, 'jsFn')(scripts[value[0] as SCRIPT_IDS])}>
-                            Example Code
-                        </ButtonCascader> : null}
-                </div>
-            </div>
+            <FieldSet>
+                <Field label="Query Type" description="How do we interact with the NAtS system">
+                    <RadioButtonGroup<QueryTypes>
+                        options={QueryTypeOptions}
+                        value={query.queryType}
+                        onChange={onQueryTypeChange(this.props, 'queryType')}
+                    />
+                </Field>
+                <Alert title={explanation.title} severity="info">
+                    {explanation.content}
+                </Alert>
+                <Field label="NATS Subject" description="the subject to request - f.e. foo.bar.baz">
+                    <Input
+                        className="width-27"
+                        value={query.natsSubject}
+                        onChange={onChange(this.props, 'natsSubject')}
+                    />
+                </Field>
+                <Field label="Request Timeout">
+                    <Input
+                        className="width-4"
+                        value={query.requestTimeout}
+                        onChange={onChange(this.props, 'requestTimeout')}
+                    />
+                </Field>
+                <Field label={explanation.mapFnLabel} style={{width: '100%'}}
+                       description={explanation.mapFnDescription}>
+                    <JavaScriptCodeEditorField
+                        expression={query.jsFn}
+                        onChange={onChangeJs(this.props, 'jsFn')}
+                    />
+                </Field>
+                {explanation.mapFnExamples ?
+                    <ButtonCascader options={explanation.mapFnExamples} onChange={(value) => onChangeJs(this.props, 'jsFn')(scripts[value[0] as SCRIPT_IDS])}>
+                        Example Code
+                    </ButtonCascader> : null}
+            </FieldSet>
         );
     }
 }

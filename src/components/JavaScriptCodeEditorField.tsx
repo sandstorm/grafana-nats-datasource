@@ -85,7 +85,7 @@ const libUri = 'ts:filename/facts.d.ts';
     title: '',
 };*/
 
-export function TamarinCodeEditorField({expression: expression, onChange}: React.PropsWithChildren<Props>) {
+export function JavaScriptCodeEditorField({expression: expression, onChange}: React.PropsWithChildren<Props>) {
     const containerRef = useRef<HTMLDivElement>(null);
     const onEditorMount = useCallback(
         (editor: monacoType.editor.IStandaloneCodeEditor, monaco: Monaco) => {
