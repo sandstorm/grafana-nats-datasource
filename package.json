@@ -1,6 +1,6 @@
 {
   "name": "nats",
-  "version": "1.1.4",
+  "version": "1.2.0",
   "description": "Nats data source for grafana",
   "scripts": {
     "build": "webpack -c ./.config/webpack/webpack.config.ts --env production",
