@@ -44,7 +44,6 @@ const scripts: {  [prop in SCRIPT_IDS]: string} = {
     headers: `
         // You can covert NATS message headers to columns (and in the same way, do any kind of calculation
 
-        // Workaround: unwrap() is needed to convert the Result object to a plain map.
         row = JSON.parse(msg.Data)
         row["otherHeader"] = msg.Header.Get("My-Header")    
         
@@ -92,7 +91,7 @@ const scripts: {  [prop in SCRIPT_IDS]: string} = {
 };
 
 
-function explanationForQueryType(queryType: QueryTypes): { title: string, content: React.ReactNode, mapFnLabel: string, mapFnDescription: React.ReactNode, mapFnExamples?: Array<CascaderOption&{value: SCRIPT_IDS}> } {
+function explanationForQueryType(queryType: QueryTypes): { title: string, content: React.ReactNode, natsSubjectDescription?: string, mapFnLabel: string, mapFnDescription: React.ReactNode, mapFnExamples?: Array<CascaderOption&{value: SCRIPT_IDS}> } {
     if (queryType === "REQUEST_REPLY") {
         return {
             title: 'Request/Reply mode explained',
@@ -108,6 +107,7 @@ function explanationForQueryType(queryType: QueryTypes): { title: string, conten
 
                 <p>You can post-process each message via JavaScript.</p>
             </>,
+            natsSubjectDescription: 'the subject to request - f.e. foo.bar.baz',
             mapFnLabel: 'Response Mapping JavaScript',
             mapFnDescription: <>
                 Input: <code>msg</code> contains the received message as a <a
@@ -135,7 +135,7 @@ function explanationForQueryType(queryType: QueryTypes): { title: string, conten
             title: 'Subscribe mode explained',
             content: <>
                 <p><a href="https://docs.nats.io/nats-concepts/core-nats/pubsub" target="_blank" rel="noreferrer">NATS
-                    Publish/Subscribe</a>:
+                    Subscribe</a>:
                     Listen to messages on the given subject pattern, and sends them via
                     <a href="https://grafana.com/docs/grafana/latest/setup-grafana/set-up-grafana-live/"
                        target="_blank" rel="noreferrer">Grafana Live</a>
@@ -146,6 +146,7 @@ function explanationForQueryType(queryType: QueryTypes): { title: string, conten
 
                 <p>You can post-process each message via the JavaScript language.</p>
             </>,
+            natsSubjectDescription: 'the subject pattern to listen on - f.e. foo.bar.>',
             mapFnLabel: 'Message Mapping JavaScript',
             mapFnDescription: <>
                 Input: <code>msg</code> contains the received message as a <a
@@ -182,9 +183,9 @@ function explanationForQueryType(queryType: QueryTypes): { title: string, conten
                 <p>The free-form script can return results directly or <em>stream them</em> to the UI. See the inline
                     script examples, they are heavily commented.</p>
 
-                <p>The API is basically like the </p>
+                <p>The API is basically like the Go API, but with errors transparently handled.</p>
             </>,
-            mapFnLabel: 'Response Mapping JavaScript',
+            mapFnLabel: 'JavaScript to send requests and/or listen to responses',
             mapFnDescription:
                 <>
                     Input: <code>nc</code> the <a
@@ -212,11 +213,19 @@ function explanationForQueryType(queryType: QueryTypes): { title: string, conten
 
         };
     }
-    assertUnreachable(queryType);
-}
 
-function assertUnreachable(x: never): never {
-    throw new Error("Didn't expect to get here");
+    return {
+        title: '',
+        content: <>
+        </>,
+        mapFnLabel: '',
+        mapFnDescription:
+            <>
+            </>,
+        mapFnExamples: [
+        ]
+
+    };
 }
 
 export class QueryEditor extends PureComponent<Props> {
@@ -226,7 +235,7 @@ export class QueryEditor extends PureComponent<Props> {
         const explanation = explanationForQueryType(query.queryType);
         return (
             <FieldSet>
-                <Field label="Query Type" description="How do we interact with the NAtS system">
+                <Field label="Query Type" description="How do we interact with the NATS system">
                     <RadioButtonGroup<QueryTypes>
                         options={QueryTypeOptions}
                         value={query.queryType}
@@ -236,13 +245,16 @@ export class QueryEditor extends PureComponent<Props> {
                 <Alert title={explanation.title} severity="info">
                     {explanation.content}
                 </Alert>
-                <Field label="NATS Subject" description="the subject to request - f.e. foo.bar.baz">
-                    <Input
-                        className="width-27"
-                        value={query.natsSubject}
-                        onChange={onChange(this.props, 'natsSubject')}
-                    />
-                </Field>
+
+                {explanation.natsSubjectDescription ?
+                    <Field label="NATS Subject" description={explanation.natsSubjectDescription}>
+                        <Input
+                            className="width-27"
+                            value={query.natsSubject}
+                            onChange={onChange(this.props, 'natsSubject')}
+                        />
+                    </Field>
+                    : undefined}
                 <Field label="Request Timeout">
                     <Input
                         className="width-4"

@@ -1,194 +1,203 @@
-# Grafana data source
+# NATS DataSource
 
+NATS is an Open Source Message Bus on steroids, with many additional features over the core functionality.
+
+If you use NATS as central system to connect different applications together, observability into the system is
+crucial.
+
+Features:
+
+- **Request/Reply:** send a request on a certain topic, and visualize the response.
+   - The response can be post-processed if needed via JavaScript.
+   - This is useful if you want to *query* some connected system via NATS when the dashboard is opened.
+- **Subscribe:** Listen to a certain topic, and visualize the messages as they stream into the system.
+   - The messages can be post-processed if needed via JavaScript.
+   - This is useful if you have a stream of continuous data (f.e. Logs) and you want to use them as they arrive.
+- **Free-Form Script:** This is an advanced mode, which can send **multiple NATS requests**, wait for **multiple responses**
+  and do **any kind of processing**. See below for examples.
+- A default **Dashboard** which shows NATS system metrics via the `$SYS` account.
+
+## Screenshots
+
+![Query Editor](./docs/query-editor.png)
+
+![Metrics Dashboard](./docs/metrics-dashboard.png)
+
+
+## Request / Reply Mode explained
+
+[NATS Request/Reply](https://docs.nats.io/nats-concepts/core-nats/reqreply) sends a request on the given subject with
+an empty payload, and *renders the single response* (delivered to the _INBOX).
+
+JSON messages can be rendered directly - nested JSON is flattened. Example messages:
+
+```
+{"key1": "val1", "key2": "value2"}
+
+[{"key1": "val1", "key2": "value2"}, {"key1": "val3"}]
+```
+
+
+You can post-process each message via JavaScript, for example:
+
+**Simple script**
+
+```js
+// This script is by default used in the backend if no script is given.
+
+// msg.Data contains the received NATS message as string.
+// by default, the last line of a script is returned automatically.
+JSON.parse(msg.Data)
+```
+
+**Accessing Headers**
+
+```js
+// You can covert NATS message headers to columns (and in the same way, do any kind of calculation)
+
+row = JSON.parse(msg.Data)
+row["otherHeader"] = msg.Header.Get("My-Header")    
+
+return row
+```
+
+
+### Scripting API
+
+Input: `msg` contains the received message as a [nats.Msg](https://pkg.go.dev/github.com/nats-io/nats.go#Msg).
+
+Supported Return values: A map `{k: "v"}`, a list of maps `[{k: "v"}]`,
+a [data.Frame](https://pkg.go.dev/github.com/grafana/grafana-plugin-sdk-go@v0.147.0/data#Frame).
+
+
+
+## Subscribe Mode explained
+
+[NATS Subscribe](https://docs.nats.io/nats-concepts/core-nats/pubsub) listens to messages on the given subject pattern,
+and sends them via [Grafana Live](https://grafana.com/docs/grafana/latest/setup-grafana/set-up-grafana-live/) to the
+frontend.
+
+JSON messages can be rendered directly - nested JSON is flattened. Example messages:
+
+```
+{"key1": "val1", "key2": "value2"}
+```
+
+You can post-process each message via JavaScript, for example:
+
+**Simple script**
+
+```js
+// This script is by default used in the backend if no script is given.
+
+// msg.Data contains the received NATS message as string.
+// by default, the last line of a script is returned automatically.
+JSON.parse(msg.Data)
+```
+
+**Accessing Headers**
+
+```js
+// You can covert NATS message headers to columns (and in the same way, do any kind of calculation)
+
+row = JSON.parse(msg.Data)
+row["otherHeader"] = msg.Header.Get("My-Header")    
+
+return row
+```
+
+### Scripting API
+
+Input: `msg` contains the received message as a [nats.Msg](https://pkg.go.dev/github.com/nats-io/nats.go#Msg).
+
+Supported Return values: A map `{k: "v"}` (because the results are *streamed* to the UI).
+
+
+
+## Free-Form Script (advanced) explained
+
+For advanced use cases, a free-form script can be used, which directly controls how messages
+are sent and how their responses are processed:
+
+- to *handle multiple replies to the same request*
+- to send multiple *dependent requests*
+- to *collect/reduce multiple responses* into a single UI response,
+- other advanced cases.
+
+The free-form script can return results directly or *stream them* to the UI. See the inline
+script examples, they are heavily commented.
+
+The API is basically like the Go API, but with errors transparently handled.
+
+**Multiple Requests**
+
+```js
+// do two requests on different NATS subjects (json1 and json2)
+const msg1 = nc.Request("json1", "", "50ms");
+const msg2 = nc.Request("json2", "", "50ms");
+
+// parse the response data as JSON
+const parsed1 = JSON.parse(msg1.Data);
+const parsed2 = JSON.parse(msg2.Data);
+
+// return the concatenated list
+return [parsed1, parsed2];
+```
+
+**Multiple Responses**
+
+```js
+// Sometimes, you receive *multiple responses* for a single request, f.e. when
+// triggering $SYS.REQ.SERVER.PING in the SYS account, you will receive one answer
+// per server.
+//
+// That's why we manually create an inbox for the reply; and poll it as
+// long as there are messages.
+const result = [];
+
+const inbox = nc.NewInbox();
+// The ordering is crucial: we first need to create the subscription, before
+// sending the request (otherwise we might miss the response).
+const subscription = nc.SubscribeSync(inbox);
+nc.PublishRequest("$SYS.REQ.SERVER.PING", inbox, "");
+while(true) {
+  // we poll until we do not receive a message anymore within the given timeout.
+  const msg = subscription.NextMsg("50ms");
+  if (!msg) {
+    // ... when this happens, we return the accumulated result.
+    return result;
+  }
+  // here, we parse the given message.
+  const parsed = JSON.parse(msg.Data);
+  delete parsed.statsz.routes;
+  result.push(parsed);
+}
+```
+
+### Scripting API
+
+Input: `nc` the [nats.Conn](https://pkg.go.dev/github.com/nats-io/nats.go#Conn) you can use to:
+
+- [nc.Subscribe()](https://pkg.go.dev/github.com/nats-io/nats.go#Conn.Subscribe) for subscribing to a topic;
+- [nc.Request()](https://pkg.go.dev/github.com/nats-io/nats.go#Conn.Request) for sending out a request, and listening
+  to a response
+- any other interaction with the Go API.
+
+Supported Return values: A map `{k: "v"}`, a list of maps `[{k: "v"}]`,
+a [data.Frame](https://pkg.go.dev/github.com/grafana/grafana-plugin-sdk-go@v0.147.0/data#Frame).
 
 ## Developing
 
-
 ```
-dev setup
-dev build-backend
-dev watch-frontend
-dev up
+./dev.sh setup
+./dev.sh build-backend
+./dev.sh watch-frontend
+./dev.sh up
 # http://127.0.0.1:3000/plugins?filterBy=all&q=nats
 
 # to hot-reload the plugin:
-dev reload-plugin
+./dev.sh reload-plugin
 
-dev test-nats-server 
+./dev.sh test-nats-server 
 ```
 
-
-
-## Kickstarting new plugin
-
-following https://grafana.com/tutorials/build-a-data-source-plugin/
-
-```
-npx @grafana/create-plugin
-? What is going to be the name of your plugin? NATS
-? What is the organization name of your plugin? sandstormmedia
-? How would you describe your plugin? NATS data source for Grafana
-? What type of plugin would you like? datasource
-? Do you want a backend part of your plugin? Yes
-? Do you want to add Github CI and Release workflows? Yes
-? Do you want to add a Github workflow for automatically checking "Grafana API compatibility" on PRs? Yes
-```
-
-
-## Helpful links
-
-https://grafana.com/docs/grafana/latest/developers/
-https://grafana.com/docs/grafana/latest/developers/plugins/data-frames/
-https://grafana.com/docs/grafana/latest/developers/plugins/development-with-local-grafana/
-https://grafana.com/tutorials/build-a-data-source-plugin/
-https://grafana.com/tutorials/build-a-streaming-data-source-plugin/
-- https://grafana.com/docs/grafana/latest/setup-grafana/set-up-grafana-live/
-
-UI Components
-- https://developers.grafana.com/ui/latest/index.html?path=/story/forms-cascader-buttoncascader--simple
-- https://github.com/grafana/grafana/tree/main/packages/grafana-ui/src/components
-
-https://github.com/cloudcmds/tamarin
-https://github.com/cloudcmds/tamarin/blob/3de571dcd2f3b869ec6819366944d9a74182eebd/vscode/syntaxes/tamarin.grammar.json
-https://github.com/grafana/grafana/blob/58a41af3f34082987c8ccebb4565cc20b4cee1b8/public/app/plugins/datasource/loki/components/monaco-query-field/MonacoQueryField.tsx
-
-TODO https://blog.checklyhq.com/customizing-monaco/
-https://microsoft.github.io/monaco-editor/monarch.html
-
-
-
-
- plugin template
-
-This template is a starting point for building a Data Source Plugin for Grafana.
-
-## What are Grafana data source plugins?
-
-Grafana supports a wide range of data sources, including Prometheus, MySQL, and even Datadog. There’s a good chance you can already visualize metrics from the systems you have set up. In some cases, though, you already have an in-house metrics solution that you’d like to add to your Grafana dashboards. Grafana Data Source Plugins enables integrating such solutions with Grafana.
-
-## Getting started
-
-### Backend
-
-1. Update [Grafana plugin SDK for Go](https://grafana.com/docs/grafana/latest/developers/plugins/backend/grafana-plugin-sdk-for-go/) dependency to the latest minor version:
-
-   ```bash
-   go get -u github.com/grafana/grafana-plugin-sdk-go
-   go mod tidy
-   ```
-
-2. Build backend plugin binaries for Linux, Windows and Darwin:
-
-   ```bash
-   mage -v
-   ```
-
-3. List all available Mage targets for additional commands:
-
-   ```bash
-   mage -l
-   ```
-### Frontend
-
-1. Install dependencies
-
-   ```bash
-   yarn install
-   ```
-
-2. Build plugin in development mode and run in watch mode
-
-   ```bash
-   yarn dev
-   ```
-
-3. Build plugin in production mode
-
-   ```bash
-   yarn build
-   ```
-
-4. Run the tests (using Jest)
-
-   ```bash
-   # Runs the tests and watches for changes, requires git init first
-   yarn test
-   
-   # Exists after running all the tests
-   yarn test:ci
-   ```
-
-5. Spin up a Grafana instance and run the plugin inside it (using Docker)
-
-   ```bash
-   yarn server
-   ```
-
-6. Run the E2E tests (using Cypress)
-
-   ```bash
-   # Spin up a Grafana instance first that we tests against 
-   yarn server
-   
-   # Start the tests
-   yarn e2e
-   ```
-
-7. Run the linter
-
-   ```bash
-   yarn lint
-   
-   # or
-
-   yarn lint:fix
-   ```
-
-
-# Distributing your plugin
-
-When distributing a Grafana plugin either within the community or privately the plugin must be signed so the Grafana application can verify its authenticity. This can be done with the `@grafana/sign-plugin` package.
-
-_Note: It's not necessary to sign a plugin during development. The docker development environment that is scaffolded with `@grafana/create-plugin` caters for running the plugin without a signature._
-
-## Initial steps
-
-Before signing a plugin please read the Grafana [plugin publishing and signing criteria](https://grafana.com/docs/grafana/latest/developers/plugins/publishing-and-signing-criteria/) documentation carefully.
-
-`@grafana/create-plugin` has added the necessary commands and workflows to make signing and distributing a plugin via the grafana plugins catalog as straightforward as possible.
-
-Before signing a plugin for the first time please consult the Grafana [plugin signature levels](https://grafana.com/docs/grafana/latest/developers/plugins/sign-a-plugin/#plugin-signature-levels) documentation to understand the differences between the types of signature level.
-
-1. Create a [Grafana Cloud account](https://grafana.com/signup).
-2. Make sure that the first part of the plugin ID matches the slug of your Grafana Cloud account.
-   - _You can find the plugin ID in the plugin.json file inside your plugin directory. For example, if your account slug is `acmecorp`, you need to prefix the plugin ID with `acmecorp-`._
-3. Create a Grafana Cloud API key with the `PluginPublisher` role.
-4. Keep a record of this API key as it will be required for signing a plugin
-
-## Signing a plugin
-
-### Using Github actions release workflow
-
-If the plugin is using the github actions supplied with `@grafana/create-plugin` signing a plugin is included out of the box. The [release workflow](./.github/workflows/release.yml) can prepare everything to make submitting your plugin to Grafana as easy as possible. Before being able to sign the plugin however a secret needs adding to the Github repository.
-
-1. Please navigate to "settings > secrets > actions" within your repo to create secrets.
-2. Click "New repository secret"
-3. Name the secret "GRAFANA_API_KEY"
-4. Paste your Grafana Cloud API key in the Secret field
-5. Click "Add secret"
-
-#### Push a version tag
-
-To trigger the workflow we need to push a version tag to github. This can be achieved with the following steps:
-
-1. Run `npm version <major|minor|patch>`
-2. Run `git push origin main --follow-tags`
-
-
-## Learn more
-
-Below you can find source code for existing app plugins and other related documentation.
-
-- [Basic data source plugin example](https://github.com/grafana/grafana-plugin-examples/tree/master/examples/datasource-basic#readme)
-- [Plugin.json documentation](https://grafana.com/docs/grafana/latest/developers/plugins/metadata/)
-- [How to sign a plugin?](https://grafana.com/docs/grafana/latest/developers/plugins/sign-a-plugin/)
