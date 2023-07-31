@@ -19,9 +19,9 @@ Features:
 
 ## Screenshots
 
-![Query Editor](./docs/query-editor.png)
+![Query Editor](https://raw.githubusercontent.com/sandstorm/grafana-nats-datasource/main/docs/query-editor.png)
 
-![Metrics Dashboard](./docs/metrics-dashboard.png)
+![Metrics Dashboard](https://raw.githubusercontent.com/sandstorm/grafana-nats-datasource/main/docs/metrics-dashboard.png)
 
 
 ## Request / Reply Mode explained
